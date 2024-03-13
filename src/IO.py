@@ -1,0 +1,65 @@
+import os
+import numpy as np
+from src import fisher_matrix
+from src.configs import DictAsMember
+
+
+def save_fisher_matrix(config: DictAsMember, fisher: fisher_matrix, name: 'str'):
+    output_dir = config.paths.output.fisher_matrix
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    np.save(os.path.join(output_dir, f'{config.name}_{name}.npy'),
+            fisher.fisher_matrix)
+
+
+def save_fisher_matrix_validation(config: DictAsMember,
+                                  shifts_array: np.ndarray,
+                                  validation_array: np.ndarray,
+                                  name: str):
+    output_dir = config.paths.output.fisher_matrix
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    np.savez(os.path.join(output_dir, f'{config.name}_{name}.npz'),
+             shifts=shifts_array, validation=validation_array)
+
+
+def load_fisher_matrix(config: DictAsMember,
+                       name: str, one_shape: bool=False) -> fisher_matrix:
+    fisher_matrix_array = np.load(os.path.join(config.paths.output.fisher_matrix,
+                                f'{config.name}_{name}.npy'))
+
+    N_z_bins = config.redshift_distributions.sources.N_z_bins
+
+    cosmo_params = {'name': list(config.cosmology.keys()),
+                    'fiducial': list(config.cosmology.values()),
+                    'shift': [config.step_size[x] for x in list(config.cosmology.keys())],
+                    'latex': ['$\Omega_\mathrm{m}$', '$\Omega_\mathrm{b}$', '$h$',
+                              '$\sigma_8$', '$n_\mathrm{s}$', r'$w_0$', r'$w_a$']}
+    IA_params = {'name': list(config.IA.keys()),
+                 'fiducial': list(config.IA.values()),
+                 'shift': [config.step_size[x] for x in list(config.IA.keys())],
+                 'latex': ['$A_1$', '$A_2$']}
+    if one_shape:
+        IA_params = {'name': IA_params['name'][:1],
+                        'fiducial': IA_params['fiducial'][:1],
+                        'shift': IA_params['shift'][:1],
+                        'latex': IA_params['latex'][:1]}
+    redshift_params = {'name': [f'dz{i+1}' for i in range(N_z_bins)],
+                       'fiducial': [0.] * N_z_bins,
+                       'shift': [config.step_size.delta_z] * N_z_bins,
+                       'latex': ['$\Delta z_{%i}$' % (i + 1) for i in range(N_z_bins)]}
+
+    fisher_matrix_object = fisher_matrix(fisher_from_input=fisher_matrix_array,
+                                     cosmo_params=cosmo_params,
+                                     IA_params=IA_params,
+                                     redshift_params=redshift_params)
+    return fisher_matrix_object
+
+
+def load_fisher_matrix_validation(config: DictAsMember,
+                                  name: str) -> (np.ndarray, np.ndarray):
+    data = np.load(os.path.join(config.paths.output.fisher_matrix,
+                                f'{config.name}_{name}.npz'))
+    return data['shifts'], data['validation']

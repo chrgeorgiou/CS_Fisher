@@ -1,0 +1,65 @@
+import functools
+import yaml
+import os
+from numpy import pi
+
+
+class DictAsMember(dict):
+    # Allows for getting attributes of dictionaries
+    def __getattr__(self, name):
+        value = self[name]
+        if isinstance(value, dict):
+            value = DictAsMember(value)
+        return value
+
+    def __dir__(self):
+        # Allows autocompletion
+        return self.keys()
+
+
+class StringConcatenation(yaml.YAMLObject):
+    # Allows to join two variables in yaml file
+    yaml_loader = yaml.SafeLoader
+    yaml_tag = '!join'
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        return functools.reduce(lambda a, b: os.path.join(a.value, b.value), node.value)
+
+
+def load_config(config_file):
+    with open(config_file, 'r') as cf:
+        config = yaml.safe_load(cf)
+    config.update(redshift_distributions_for_year(config['forecast']['year']))
+    return DictAsMember(config)
+
+
+def redshift_distributions_for_year(year):
+    # TODO: add lens numbers
+    if year == 10:
+        neff = 27  # arcmin2 from SRD p.54
+        z0, a = 0.11, 0.68
+        sigma_delta_z = 0.001
+    elif year == 1:
+        neff = 10
+        z0, a = 0.13, 0.78
+        sigma_delta_z = 0.002
+    else:
+        raise ValueError('Only year 1 and year 10 is supported.')
+    N_z_bins = 5
+    sigma_z = 0.05
+    nbar = neff * (60 * 180 / pi) ** 2
+
+    source_redshift_distributions = {
+        'redshift_distributions': {
+            'sources': {
+                'z0': z0,
+                'a': a,
+                'sigma_z': sigma_z,
+                'sigma_delta_z': sigma_delta_z,
+                'nbar': nbar,
+                'N_z_bins': N_z_bins
+            }
+        }
+    }
+    return source_redshift_distributions

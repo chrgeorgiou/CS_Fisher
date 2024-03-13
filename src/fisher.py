@@ -1,0 +1,493 @@
+import numpy as np
+import pyccl as ccl
+from scipy.interpolate import interp1d
+from matplotlib.patches import Ellipse
+from scipy.stats import chi2
+import warnings
+
+
+def get_Cell_data_vector(cosmo: ccl.Cosmology,
+                         z: np.ndarray, dndz: np.ndarray,
+                         A_IA: float, ell: np.ndarray)\
+        -> dict:
+    """
+    Computes the cosmic shear C_ell's. Assumes constant A_IA.
+
+    Args:
+        cosmo (object): A CCL cosmology object.
+        z (array): The redshift values where the n(z) has been computed.
+        dndz (array): The redshift distribution n(z) for each redshift bin.
+            If 1-D, one redshift bin is assumed. Otherwise, the dimensions should be
+            (n_z_bins, n_z_values).
+        A_IA (float): Value of the intrinsic alignment amplitude.
+        ell (array): Values of multipoles where the C_ell's will be computed.
+
+    Returns:
+        c_ells (dict): A dictionary with keys corresponding to tracers and values to C-ells.
+            The tracers will be 'zi-zj', where i,j denote the redshift bins.
+    """
+    dndz_use = np.atleast_2d(dndz)
+    n_z_bins = dndz_use.shape[0]
+
+    c_ells = {}
+    for z1 in range(n_z_bins):
+        for z2 in range(n_z_bins):
+            if z2 < z1: continue
+            tracer1 = ccl.WeakLensingTracer(cosmo, dndz=(z, dndz_use[z1]),
+                                            ia_bias=(z, A_IA*np.ones_like(z)))
+            tracer2 = ccl.WeakLensingTracer(cosmo, dndz=(z, dndz_use[z2]),
+                                            ia_bias=(z, A_IA*np.ones_like(z)))
+            c_ells[f'z{z1}-z{z2}'] = ccl.angular_cl(cosmo, tracer1, tracer2, ell,
+                                                    )#limber_integration_method='spline')
+    return c_ells
+
+
+def get_nt_nz(c_ells: dict) -> (int, int):
+    '''
+    Returns the number of redshift bins, given a C_ell's dictionary.
+
+    Args:
+        c_ells (dict): A dictionary obtained with ```get_Cell_data_vector```.
+    '''
+    tracer_combinations = list(c_ells.keys())
+    # FIXME: This doesn't work for more than 10 bins!
+    n_zbins = len(np.unique([x[1] for x in tracer_combinations]))
+    return n_zbins
+
+
+def get_covariance(ell: np.ndarray, c_ells: dict,
+                   n_bar: float, sig_e: float,
+                   f_sky: float = 1., Delta_ell: np.ndarray = None)\
+        -> np.ndarray:
+    """
+    Computes the Gaussian shape-noise covariance terms of the given C_ell's.
+    Assumes equipopulated redshift bins.
+
+    Args:
+        ell (array): Values of ell multipoles where the C_ell's have been computed.
+        c_ells (dict): A dictionary obtained with ```get_Cell_data_vector```.
+        n_bar (float): Number density in steradians for the whole survey. This will
+            be divided by the number of redshift bins internally.
+        sig_e (float or iterable): Ellipticity rms.
+        f_sky (float): Fraction of sky covered by the assumed survey, from 0 to 1.
+        Delta_ell (None or array): The distance between the ell bins. If None, the bins
+            are assumed to be linear and have a distance of 1.
+
+    Returns:
+        covariance (np.ndarray): A 3-dimensional array where the first axis
+        contains the numerical value of the covariance for the given ell's,
+        and the second and third axes contain the two combination of redshift
+        bins correlated.
+    """
+    n_z_bins = get_nt_nz(c_ells)
+    tracer_combinations = c_ells.keys()
+    c_ell_vec_full = c_ells.copy()
+
+    noise = {}
+    for z1 in range(n_z_bins):
+        for z2 in range(n_z_bins):
+            if f'z{z1}-z{z2}' not in tracer_combinations:
+                c_ell_vec_full[f'z{z1}-z{z2}'] = c_ells[f'z{z2}-z{z1}']
+            if z1 == z2:
+                noise[f'z{z1}-z{z2}'] = sig_e**2/(2*n_bar/n_z_bins)
+            else:
+                noise[f'z{z1}-z{z2}'] = 0
+
+    if Delta_ell is None:
+        cov_prefactor = 1 / ((2 * ell + 1) * f_sky)
+    else:
+        cov_prefactor = 1 / (2 * f_sky * ell * Delta_ell)
+    covariance = np.zeros((len(ell), len(tracer_combinations), len(tracer_combinations)))
+    for i, tc1 in enumerate(tracer_combinations):
+        for j, tc2 in enumerate(tracer_combinations):
+            if i > j: continue
+            t1, t2 = tc1.split('-')
+            t3, t4 = tc2.split('-')
+            covariance[:, i, j] = ((c_ell_vec_full[f'{t1}-{t3}'] + noise[f'{t1}-{t3}'])
+                                   * (c_ell_vec_full[f'{t2}-{t4}'] + noise[f'{t2}-{t4}'])
+                                   + (c_ell_vec_full[f'{t1}-{t4}'] + noise[f'{t1}-{t4}'])
+                                   * (c_ell_vec_full[f'{t2}-{t3}'] + noise[f'{t2}-{t3}'])
+                                   ) * cov_prefactor
+            covariance[:, j, i] = covariance[:, i, j]
+    return covariance
+
+
+def compute_SNR(c_ells: dict, covariance: np.ndarray) -> float:
+    """
+    Computes the signal-to-noise ratio given a C_ell's dictionary and
+    a covariance array.
+
+    Args:
+        c_ells (dict): A dictionary of C_ell's obtained with ```get_Cell_data_vector```.
+        covariance (array): An array containing the covariance obtained with
+            ```get_covariance```.
+    """
+    N_ells = covariance.shape[0]
+    data = np.array(list(c_ells.values())).T
+    SNR = 0
+    for l in range(N_ells):
+        invcov = np.linalg.inv(covariance[l])
+        SNR += np.dot(np.dot(data[l].T, invcov), data[l])
+    return SNR ** 0.5
+
+
+def compute_d_Cells(n_points: int,
+                    cosmo_params: dict, IA_params: dict, redshift_params: dict,
+                    z: np.ndarray, dndz: np.ndarray, ell: np.ndarray,
+                    verbose: bool = False) -> np.ndarray:
+    """
+    Computes the numerical derivatives of the C_ell's with respect to the input
+    cosmological, intrinsic alignment and photo-z uncertainty parameters using
+    the n_point stencil method.
+
+    Args:
+        n_points (float): The number of points to use for the stencil method to
+            compute the derivatives.
+        cosmo_params (dict): A dictionary with the keys "fiducial" and a LIST of
+            all fiducial values for the cosmological parameters used. It should
+            also contain the key "shift" with a LIST of values for the step-size
+            of the derivatives for each of the parameters. If some parameter has
+            a corresponding "None" shift, it is not being varied.
+        IA_params (dict): Similar to the one above but now contains the
+            intrinsic alignment parameter(s).
+        redshift_params (dict): Similar to the one above but now contains the
+            shifts on the redshift distributions.
+        z (array): The redshift values where the n(z) has been computed.
+        dndz (array): The redshift distribution n(z) for each redshift bin.
+            If 1-D, one redshift bin is assumed. Otherwise, the dimensions should be
+            (n_z_bins, n_z_values).
+        ell (array): Values of ell multipoles where the C_ell's have been computed.
+        verbose (bool): If true, print statements for when derivatives are taken
+            for different parameters will be created.
+
+    Returns:
+        d_Cells (np.ndarray): A 3-dimensional array. Its first axis contains the
+            ell value. The second axis contains the different parameters with
+            respect to which derivatives are taken. These are the parameters in
+            cosmo_params, IA_params and redshift_params, in numerical ascending
+            order. The third axis contains the different combination of redshift
+            bins that were used to compute the C_ell's.
+    """
+    dndz_use = np.atleast_2d(dndz)
+    N_cosmo = len(cosmo_params['fiducial'])
+    N_z_bins = dndz_use.shape[0]
+    N_Cells = int(np.sum(np.arange(1, N_z_bins+1)))
+    N_params_varied = int(np.count_nonzero(cosmo_params['shift']) +
+                          np.count_nonzero(IA_params['shift']) +
+                          np.count_nonzero(redshift_params['shift']))
+    d_Cells = np.zeros((len(ell), N_params_varied, N_Cells))
+
+    # TODO: Automate this for whichever n_points.
+    if n_points == 3:
+        coeff = [-1 / 2, 1 / 2]
+    elif n_points == 5:
+        coeff = [1 / 12, -2 / 3, 2 / 3, -1 / 12]
+    elif n_points == 7:
+        coeff = [-1 / 60, 3 / 20, -3 / 4, 3 / 4, -3 / 20, 1 / 60]
+    elif n_points == 9:
+        coeff = [1 / 280, -4 / 105, 1 / 5, -4 / 5, 4 / 5, -1 / 5, 4 / 105, -1 / 280]
+    else:
+        raise ValueError(f'The n_points {n_points:d} given is not supported (use 3, 5, 7 or 9).')
+    step_coeff = np.arange(-(n_points // 2), n_points // 2 + 1, 1)
+    step_coeff = step_coeff[step_coeff != 0]
+
+    params_fiducial = np.concatenate((cosmo_params['fiducial'], IA_params['fiducial'], redshift_params['fiducial']))
+    params_shift = np.concatenate((cosmo_params['shift'], IA_params['shift'], redshift_params['shift']))
+
+    di = 0
+    for pi, p in enumerate(params_fiducial):
+        if params_shift[pi] is None: continue
+        # TODO: verbose is currently not accessible.
+        if verbose: print('Computing derivatives for parameter %i' % pi)
+        for n in range(n_points-1):
+            param_in = params_fiducial.copy()
+            param_in[pi] += step_coeff[n] * params_shift[pi]
+            # Define cosmology input dictionary
+            cosmo_params_in = param_in[:N_cosmo]
+            cosmo_in_dict = dict(zip(cosmo_params['name'], cosmo_params_in))
+            if 'Omega_m' in cosmo_in_dict.keys():
+                cosmo_in_dict['Omega_c'] = cosmo_in_dict['Omega_m'] - cosmo_in_dict['Omega_b']
+                cosmo_in_dict.pop('Omega_m')
+
+            # Define the IA input parameters
+            A_IA_in = param_in[N_cosmo]
+
+            # Define the input redshift distributions
+            dndz_in = dndz_use.copy()
+            if pi >= N_cosmo+1:
+                delta_z_in = param_in[pi]
+                shifted_bin = pi-(N_cosmo+1)
+                interp_dndz = interp1d(z, dndz_use[shifted_bin], bounds_error=False, fill_value=0)
+                dndz_in[shifted_bin] = interp_dndz(z + delta_z_in)
+
+            cosmo_in = ccl.Cosmology(**cosmo_in_dict, extra_parameters={"camb": {"dark_energy_model": "ppf"}})
+            C_ells = get_Cell_data_vector(cosmo_in, z, dndz_in, A_IA_in, ell)
+            d_Cells[:, di, :] += coeff[n] * np.array(list(C_ells.values())).T / params_shift[pi]
+        di += 1
+    return d_Cells
+
+
+def compute_Fisher_matrix(d_Cells: np.ndarray, covariance: np.ndarray):
+    """
+    Computes the Fisher matrix given C_ell's derivatives and covariance arrays.
+
+    Args:
+        d_Cells (array): The output from ```compute_d_Cells```.
+        covariance (array): The output from ```get_covariance```.
+
+    Returns:
+        fisher (array): An array of size NxN, where N is the number of
+            parameters varied (given by d_Cells.shape[1]).
+    """
+    N_params = d_Cells.shape[1]
+
+    fisher = np.zeros((N_params, N_params))
+    for l in range(covariance.shape[0]):
+        invcov = np.linalg.inv(covariance[l])
+        fisher += (d_Cells[l].dot(invcov)).dot(d_Cells[l].T)
+    return fisher
+
+
+class fisher_matrix(object):
+
+    def __init__(self, *, cosmo=None, z=None, dndz=None,
+                 ell=None, sigma_e=None, n_bar=None, fsky=None,
+                 Delta_ell=None, n_points=3,
+                 cosmo_params=None, IA_params=None, redshift_params=None,
+                 fisher_from_input=None):
+        self.cosmo = cosmo
+        self.z = z
+        self.dndz = dndz
+        self.ell = ell
+        self.sigma_e = sigma_e
+        self.n_bar = n_bar
+        self.fsky = fsky
+        self.Delta_ell = Delta_ell
+        self.n_points = n_points
+        self.cosmo_params = cosmo_params
+        self.IA_params = IA_params
+        self.redshift_params = redshift_params
+        self.fisher_from_input = fisher_from_input
+
+        if cosmo_params is None:
+            self.cosmo_params = {'name': [], 'fiducial': [], 'shift': []}
+        if IA_params is None:
+            self.IA_params = {'name': [], 'fiducial': [], 'shift': [None]}
+        if redshift_params is None:
+            self.redshift_params = {'name': [], 'fiducial': [], 'shift': []}
+
+        assert all(s in self.cosmo_params for s in ['name', 'fiducial']) and \
+               all(s in self.IA_params for s in ['name', 'fiducial']) and \
+               all(s in self.redshift_params for s in ['name', 'fiducial'])
+        try: A_IA = np.atleast_1d(IA_params['fiducial'])
+        except: A_IA = 0.
+        for param_dict in [self.cosmo_params, self.IA_params, self.redshift_params]:
+            if 'latex' not in param_dict:
+                param_dict['latex'] = param_dict['name']
+            if 'shift' not in param_dict:
+                param_dict['shift'] = [-1.]*len(param_dict['name'])
+
+        if fisher_from_input is None:
+            self.C_ell = get_Cell_data_vector(self.cosmo, self.z, self.dndz, A_IA, self.ell)
+            self.data_covariance = get_covariance(self.ell, self.C_ell,
+                                                  self.n_bar, self.sigma_e,
+                                                  f_sky=self.fsky, Delta_ell=self.Delta_ell)
+            self.SNR = compute_SNR(self.C_ell, self.data_covariance)
+            self.d_C_ell = compute_d_Cells(n_points=self.n_points,
+                                           cosmo_params=self.cosmo_params,
+                                           IA_params=self.IA_params,
+                                           redshift_params=self.redshift_params,
+                                           z=self.z, dndz=self.dndz, ell=self.ell)
+            self.fisher_matrix = compute_Fisher_matrix(self.d_C_ell, self.data_covariance)
+        else:
+            self.fisher_matrix = fisher_from_input
+
+        params_shift = np.concatenate((self.cosmo_params['shift'],
+                                       self.IA_params['shift'],
+                                       self.redshift_params['shift']))
+        ids_varied = np.where(params_shift != None)[0]
+
+        self.parameters = np.concatenate((self.cosmo_params['name'],
+                                          self.IA_params['name'],
+                                          self.redshift_params['name'])
+                                         )[ids_varied]
+        self.fiducial_parameters = np.concatenate((self.cosmo_params['fiducial'],
+                                                   self.IA_params['fiducial'],
+                                                   self.redshift_params['fiducial'])
+                                                  )[ids_varied]
+        self.latex_parameters = np.concatenate((self.cosmo_params['latex'],
+                                                self.IA_params['latex'],
+                                                self.redshift_params['latex'])
+                                               )[ids_varied]
+        self.covariance = np.linalg.inv(self.fisher_matrix)
+
+    def __getitem__(self, *keys):
+        """ Determines behavior of `self[key]` """
+        keys_in = np.atleast_1d(keys[0])
+        assert all(s in self.parameters for s in keys_in)
+
+        keys_indices = np.arange(len(self.parameters))[np.in1d(self.parameters, keys_in)]
+        return self.fisher_matrix[np.ix_(keys_indices, keys_indices)]
+
+    def add_prior(self, parameters: {str, iter},
+                  sigma_parameters: {float, iter}):
+        """
+        Adds a Gaussian prior to the parameters provided.
+
+        Args:
+            parameters (iterable): The parameter(s) for which a Gaussian prior
+                will be added to the Fisher matrix.
+            sigma_parameters (iterable): The scale of the Gaussian distribution
+                of the prior.
+        """
+        parameters_ = np.atleast_1d(parameters)
+        sigma_parameters_ = np.atleast_1d(sigma_parameters)
+        assert len(parameters_) == len(sigma_parameters_)
+        for i, param in enumerate(parameters_):
+            param_id = np.in1d(self.parameters, param)
+            self.fisher_matrix[param_id, param_id] += 1./sigma_parameters_[i]**2
+        self.covariance = np.linalg.inv(self.fisher_matrix)
+        self.priors = [parameters_, sigma_parameters_]
+
+    def marginalised_covariance(self, parameters: iter) -> np.ndarray:
+        """
+        Returns the marginalised covariance of the Fisher matrix.
+
+        Args:
+            parameters (iterable): The parameter(s) over which the marginalised
+                covariance will be computed.
+        """
+        param_indices = np.arange(len(self.parameters))[np.in1d(self.parameters, parameters)]
+        return self.covariance[np.ix_(param_indices, param_indices)]
+
+    def figure_of_merit(self, parameters: iter) -> float:
+        """
+        Returns the figure-of-merit for the given parameters.
+
+        Args:
+            parameters (iterable): The parameter(s) over which the figure-of-
+                merit will be computed.
+        """
+        return np.sqrt(np.linalg.det(np.linalg.inv(self.marginalised_covariance(parameters))))
+
+    def draw_covariance_ellipse(self, ax: object, parameters: iter,
+                                CL: float = 0.95, color: str = None, fill: bool = True,
+                                **kwargs)\
+            -> (object, tuple, tuple, tuple, tuple):
+        """
+        Draws an ellipse with a marginalised covariance matrix computed over
+        the parameters provided.
+
+        Args:
+          ax (object): Axes matplotlib object where to draw.
+          parameters (2-dim iterable): The parameters over which the ellipse
+            will be drawn.
+          CL (float): Confidence interval on which to draw the ellipse (0<CL<1).
+          color (str or None): The color of ellipse (leave None for default).
+          fill (bool): whether to return filled ellipses or not.
+
+        Returns:
+            ax (object): The matplotlib axes object that contains the ellipse.
+            xlim (tuple): The limits on the x-axis that encompass the ellipse.
+            ylim (tuple): The limits on the y-axis that encompass the ellipse.
+            mu (tuple): The center of the ellipse.
+            latex (tuple): The latex string of the parameters.
+        """
+
+        # TODO: Make this into an iterable to be able to draw multiple ellipses with one call.
+        # Convert CL into covariance scale factor.
+        assert 0 < CL < 1
+        scale = chi2.ppf(q=CL, df=2)
+
+        assert len(parameters) == 2
+        C = self.marginalised_covariance(parameters)
+        mu = self.fiducial_parameters[np.in1d(self.parameters, parameters)]
+        latex = self.latex_parameters[np.in1d(self.parameters, parameters)]
+        a = C[0, 0]  # sigma_x^2
+        b = C[0, 1]  # sigma_xy
+        c = C[1, 1]  # sigma_y^2
+
+        # semi-major axis (squared and scaled)
+        lambda1 = scale * 0.5 * (a + c + np.sqrt((a - c) ** 2 + 4 * b ** 2))
+        # semi-minor axis (squared and scaled)
+        lambda2 = scale * 0.5 * (a + c - np.sqrt((a - c) ** 2 + 4 * b ** 2))
+        # angle
+        angle = np.rad2deg(0.5 * np.arctan2(2 * b, a - c))
+
+        # Multiply by 2 because Ellipse takes major/minor axis
+        width = 2 * np.sqrt(lambda1)
+        height = 2 * np.sqrt(lambda2)
+
+        ellipse = Ellipse(xy=mu, width=width, height=height, angle=angle,
+                          facecolor=color, edgecolor=color, fill=fill, **kwargs)
+        ax.add_artist(ellipse)
+        xlim = np.sqrt(scale * C[0, 0])
+        ylim = np.sqrt(scale * C[1, 1])
+        return ax, xlim, ylim, mu, latex
+
+    def validate_fisher_matrix(self, shifts: np.ndarray = None,
+                               FoM_parameters: iter = None,
+                               shift_parameters: iter = None) -> np.ndarray:
+        """
+        Vary the derivative step size for each parameter varied in the matrix and
+        compute the figure-of-merit of some parameters to study the matrix's
+        stability.
+
+        Args:
+            shifts (array): An array with the numerical value of the shifts to
+                be explored, used to compute the numerical derivatives.
+            FoM_parameters (iterable): The parameter(s) over which the figure-
+                of-merit will be computed with each new derivative.
+            shift_parameters (iterable): The parameters over which the derivatives
+                will be computed, each with the values given in "shifts". If None,
+                all parameters of the Fisher matrix are used.
+
+        Returns:
+            FoM_output (array): A 2-dimensional array that contains the resulting
+                figure-of-merit. The varied parameters are in its first axis and
+                the different shift values in its second axis.
+        """
+        if self.fisher_from_input is not None:
+            raise ValueError('Cannot validate fisher matrix given from input.')
+        if shifts is None:
+            shifts = np.geomspace(1e-3, 1e-1, 10)
+        if shift_parameters is None:
+            shift_parameters = self.parameters
+        shift_parameters = np.atleast_1d(shift_parameters)
+        N_parameters = len(shift_parameters)
+        FoM_output = np.zeros((N_parameters, len(shifts)))
+
+        for i, shift in enumerate(shifts):
+            for pi, p in enumerate(shift_parameters):
+
+                cosmo_params_shift = self.cosmo_params.copy()
+                IA_params_shift = self.IA_params.copy()
+                redshift_params_shift = self.redshift_params.copy()
+
+                for param_dict in [cosmo_params_shift, IA_params_shift, redshift_params_shift]:
+                    param_dict['shift'] = [None]*len(param_dict['name'])
+                    if p in param_dict['name']:
+                        pi_where = np.in1d(param_dict['name'], p).nonzero()[0][0]
+                        param_dict['shift'][pi_where] = shift
+                try:
+                    d_Cell_shift = compute_d_Cells(self.n_points,
+                                                   cosmo_params=cosmo_params_shift,
+                                                   IA_params=IA_params_shift,
+                                                   redshift_params=redshift_params_shift,
+                                                   z=self.z, dndz=self.dndz, ell=self.ell)
+                except:
+                    warnings.warn(f'Unable to compute derivative of {p} for shift {shift:.4f}.')
+                    FoM_output[pi, i] = -1
+                    continue
+                d_Cell_fiducial = self.d_C_ell.copy()
+                d_Cell_fiducial[:, pi, :] = d_Cell_shift[:, 0, :]
+
+                fisher_shift = fisher_matrix(fisher_from_input=compute_Fisher_matrix(d_Cell_fiducial,
+                                                                                     self.data_covariance),
+                                             cosmo_params=self.cosmo_params,
+                                             IA_params=self.IA_params,
+                                             redshift_params=self.redshift_params)
+                try: fisher_shift.add_prior(self.priors[0], self.priors[1])
+                except: pass
+                FoM_output[pi, i] = fisher_shift.figure_of_merit(FoM_parameters)
+        return FoM_output
