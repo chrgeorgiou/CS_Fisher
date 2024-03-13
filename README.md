@@ -50,7 +50,8 @@ The fisher matrix object created will have several useful properties. It is buil
 the ```fisher_matrix``` function in ```src/fisher.py```. 
 It contains a list of the parameters, their fiducial values and latex representation, that can be accessed via
 ```fisher_matrix.parameters```, ```fisher_matrix.fiducial_parameters``` and ```fisher_matrix.latex_parameters```,
-respectively. It also contains a dictionary with the theoretical data vector that can be accessed with 
+respectively. Integrated is also a function to plot the fisher ellipse, accessed with
+```fisher_matrix.draw_covariance_ellipse```. If not read from input, also contains a dictionary with the theoretical
+data vector that can be accessed with 
 ```fisher_matrix.C_ell```. Each key of the dictionary contains the theory prediction for the corresponding redshift 
-bin combination. Integrated is also a function to plot the fisher ellipse, accessed with
-```fisher_matrix.draw_covariance_ellipse```. 
+bin combination. 
