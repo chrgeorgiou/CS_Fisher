@@ -2,7 +2,6 @@ import pyccl as ccl
 import numpy as np
 from itertools import pairwise
 from src import load_config, fisher_matrix, redshift_distributions, IO
-import matplotlib.pyplot as plt
 
 
 def main(config):
@@ -80,19 +79,6 @@ def main(config):
     print(f'Writing output.')
     IO.save_fisher_matrix(config, fm, 'fisher_matrix')
     IO.save_fisher_matrix_validation(config, shifts, FoM_validation, 'validation_fisher_matrix')
-
-    # TODO: Writing out figures (maybe own separate function).
-    print(f'Producing figures.')
-    plot_params = ['w0', 'wa']
-    fig, ax = plt.subplots()
-    ax, xlim, ylim, mu, latex = fm.draw_covariance_ellipse(
-        ax, parameters=plot_params, CL=0.393, color='b', fill=False, ls='-')
-    ax.set_xlim([mu[0] - 1.1 * xlim, mu[0] + 1.1 * xlim])
-    ax.set_ylim([mu[1] - 1.1 * ylim, mu[1] + 1.1 * ylim])
-    ax.legend()
-    ax.set_xlabel(f'{latex[0]}')
-    ax.set_ylabel(f'{latex[1]}')
-    plt.show()
 
 
 if __name__ == '__main__':

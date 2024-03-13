@@ -26,9 +26,9 @@ def save_fisher_matrix_validation(config: DictAsMember,
 
 
 def load_fisher_matrix(config: DictAsMember,
-                       name: str, one_shape: bool=False) -> fisher_matrix:
+                       name: str) -> fisher_matrix:
     fisher_matrix_array = np.load(os.path.join(config.paths.output.fisher_matrix,
-                                f'{config.name}_{name}.npy'))
+                                               f'{config.name}_{name}.npy'))
 
     N_z_bins = config.redshift_distributions.sources.N_z_bins
 
@@ -40,12 +40,7 @@ def load_fisher_matrix(config: DictAsMember,
     IA_params = {'name': list(config.IA.keys()),
                  'fiducial': list(config.IA.values()),
                  'shift': [config.step_size[x] for x in list(config.IA.keys())],
-                 'latex': ['$A_1$', '$A_2$']}
-    if one_shape:
-        IA_params = {'name': IA_params['name'][:1],
-                        'fiducial': IA_params['fiducial'][:1],
-                        'shift': IA_params['shift'][:1],
-                        'latex': IA_params['latex'][:1]}
+                 'latex': ['$A_\mathrm{IA}$']}
     redshift_params = {'name': [f'dz{i+1}' for i in range(N_z_bins)],
                        'fiducial': [0.] * N_z_bins,
                        'shift': [config.step_size.delta_z] * N_z_bins,
