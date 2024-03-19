@@ -370,7 +370,7 @@ class fisher_matrix(object):
         """
         return np.sqrt(np.linalg.det(np.linalg.inv(self.marginalised_covariance(parameters))))
 
-    def draw_covariance_ellipse(self, ax: object, parameters: iter,
+    def draw_covariance_ellipse(self, ax: object, parameters: iter, mu: iter = None,
                                 CL: float = 0.95, color: str = None, fill: bool = True,
                                 **kwargs)\
             -> (object, tuple, tuple, tuple, tuple):
@@ -382,6 +382,8 @@ class fisher_matrix(object):
           ax (object): Axes matplotlib object where to draw.
           parameters (2-dim iterable): The parameters over which the ellipse
             will be drawn.
+          mu (iter): An iterable with 2 elements, the centers of the ellipse.
+            If None, the fisher matrix object's fiducial values will be the center.
           CL (float): Confidence interval on which to draw the ellipse (0<CL<1).
           color (str or None): The color of ellipse (leave None for default).
           fill (bool): whether to return filled ellipses or not.
@@ -401,7 +403,8 @@ class fisher_matrix(object):
 
         assert len(parameters) == 2
         C = self.marginalised_covariance(parameters)
-        mu = self.fiducial_parameters[np.in1d(self.parameters, parameters)]
+        if mu is None:
+            mu = self.fiducial_parameters[np.in1d(self.parameters, parameters)]
         latex = self.latex_parameters[np.in1d(self.parameters, parameters)]
         a = C[0, 0]  # sigma_x^2
         b = C[0, 1]  # sigma_xy

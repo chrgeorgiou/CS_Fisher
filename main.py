@@ -47,11 +47,7 @@ def main(config):
     IA_params = {'name': list(config.IA.keys()),
                  'fiducial': list(config.IA.values()),
                  'shift': [config.step_size[x] for x in list(config.IA.keys())],
-                 'latex': ['$A_1$', '$A_2$']}
-    IA_params_1A = {'name': IA_params['name'][:1],
-                    'fiducial': IA_params['fiducial'][:1],
-                    'shift': IA_params['shift'][:1],
-                    'latex': IA_params['latex'][:1]}
+                 'latex': ['$A_\mathrm{IA}$']}
     redshift_params = {'name': [f'dz{i+1}' for i in range(N_z_bins)],
                        'fiducial': [0.] * N_z_bins,
                        'shift': [config.step_size.delta_z] * N_z_bins,
@@ -64,7 +60,7 @@ def main(config):
                        n_bar=config.redshift_distributions.sources.nbar,
                        fsky=config.forecast.fsky, Delta_ell=Delta_ell,
                        n_points=3, cosmo_params=cosmo_params,
-                       IA_params=IA_params_1A, redshift_params=redshift_params)
+                       IA_params=IA_params, redshift_params=redshift_params)
     # Add Gaussian photo-z priors
     mean_z = np.trapz(nz_arr * z_arr, z_arr)
     scale_z = config.redshift_distributions.sources.sigma_delta_z*(1+mean_z)
