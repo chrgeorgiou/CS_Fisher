@@ -28,15 +28,19 @@ def get_Cell_data_vector(cosmo: ccl.Cosmology,
     """
     dndz_use = np.atleast_2d(dndz)
     n_z_bins = dndz_use.shape[0]
+    if A_IA is None:
+        ia_bias = None
+    else:
+        ia_bias = (z, A_IA*np.ones_like(z))
 
     c_ells = {}
     for z1 in range(n_z_bins):
         for z2 in range(n_z_bins):
             if z2 < z1: continue
             tracer1 = ccl.WeakLensingTracer(cosmo, dndz=(z, dndz_use[z1]),
-                                            ia_bias=(z, A_IA*np.ones_like(z)))
+                                            ia_bias=ia_bias)
             tracer2 = ccl.WeakLensingTracer(cosmo, dndz=(z, dndz_use[z2]),
-                                            ia_bias=(z, A_IA*np.ones_like(z)))
+                                            ia_bias=ia_bias)
             c_ells[f'z{z1}-z{z2}'] = ccl.angular_cl(cosmo, tracer1, tracer2, ell,
                                                     )#limber_integration_method='spline')
     return c_ells
@@ -279,15 +283,14 @@ class fisher_matrix(object):
         if cosmo_params is None:
             self.cosmo_params = {'name': [], 'fiducial': [], 'shift': []}
         if IA_params is None:
-            self.IA_params = {'name': [], 'fiducial': [], 'shift': [None]}
+            self.IA_params = {'name': ['A_IA'], 'fiducial': [None], 'shift': [None]}
         if redshift_params is None:
             self.redshift_params = {'name': [], 'fiducial': [], 'shift': []}
 
         assert all(s in self.cosmo_params for s in ['name', 'fiducial']) and \
                all(s in self.IA_params for s in ['name', 'fiducial']) and \
                all(s in self.redshift_params for s in ['name', 'fiducial'])
-        try: A_IA = np.atleast_1d(IA_params['fiducial'])
-        except: A_IA = 0.
+        A_IA = self.IA_params['fiducial'][0]
         for param_dict in [self.cosmo_params, self.IA_params, self.redshift_params]:
             if 'latex' not in param_dict:
                 param_dict['latex'] = param_dict['name']
