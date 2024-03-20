@@ -56,7 +56,7 @@ def get_nt_nz(c_ells: dict) -> (int, int):
 
 
 def get_covariance(ell: np.ndarray, c_ells: dict,
-                   n_bar: float, sig_e: float,
+                   n_bar: {float, iter}, sig_e: float,
                    f_sky: float = 1., Delta_ell: np.ndarray = None)\
         -> np.ndarray:
     """
@@ -66,8 +66,10 @@ def get_covariance(ell: np.ndarray, c_ells: dict,
     Args:
         ell (array): Values of ell multipoles where the C_ell's have been computed.
         c_ells (dict): A dictionary obtained with ```get_Cell_data_vector```.
-        n_bar (float): Number density in steradians for the whole survey. This will
-            be divided by the number of redshift bins internally.
+        n_bar (float or iterable): Number density in steradians. If float, the value is
+            for the whole survey and will be divided by the number of redshift bins internally.
+            If iterable, it must have the number density per redshift bin in ascending
+             bin order (from low to high redshift).
         sig_e (float or iterable): Ellipticity rms.
         f_sky (float): Fraction of sky covered by the assumed survey, from 0 to 1.
         Delta_ell (None or array): The distance between the ell bins. If None, the bins
@@ -79,17 +81,22 @@ def get_covariance(ell: np.ndarray, c_ells: dict,
         and the second and third axes contain the two combination of redshift
         bins correlated.
     """
+    n_bar = np.atleast_1d(n_bar)
     n_z_bins = get_nt_nz(c_ells)
+    assert len(n_bar) == 1 or len(n_bar) == n_z_bins, \
+        'Number density per bin provided but not for all redshift bins.'
+    if len(n_bar) == 1:
+        n_bar = np.full(n_z_bins, n_bar[0] / n_z_bins)
     tracer_combinations = c_ells.keys()
     c_ell_vec_full = c_ells.copy()
 
-    noise = {}
+    noise = dict()
     for z1 in range(n_z_bins):
         for z2 in range(n_z_bins):
             if f'z{z1}-z{z2}' not in tracer_combinations:
                 c_ell_vec_full[f'z{z1}-z{z2}'] = c_ells[f'z{z2}-z{z1}']
             if z1 == z2:
-                noise[f'z{z1}-z{z2}'] = sig_e**2/(2*n_bar/n_z_bins)
+                noise[f'z{z1}-z{z2}'] = sig_e**2/(2*n_bar[z1])
             else:
                 noise[f'z{z1}-z{z2}'] = 0
 
@@ -341,6 +348,8 @@ class fisher_matrix(object):
                 of the prior.
         """
         parameters_ = np.atleast_1d(parameters)
+        if not np.any(np.in1d(parameters_, self.parameters)):
+            return
         sigma_parameters_ = np.atleast_1d(sigma_parameters)
         assert len(parameters_) == len(sigma_parameters_)
         for i, param in enumerate(parameters_):
