@@ -31,6 +31,7 @@ def load_config(config_file):
     with open(config_file, 'r') as cf:
         config = yaml.safe_load(cf)
     config.update(redshift_distributions_for_year(config['forecast']['year']))
+    config.update(baryons_dictionary(config['baryons']['logT_AGN']))
     return DictAsMember(config)
 
 
@@ -63,3 +64,10 @@ def redshift_distributions_for_year(year):
         }
     }
     return source_redshift_distributions
+
+
+def baryons_dictionary(logT_AGN=None):
+    if logT_AGN is None:
+        return {"baryons_dict": {}}
+    else:
+        return {"baryons_dict": {"kmax": 20.0, "halofit_version": "mead2020_feedback", "HMCode_logT_AGN": logT_AGN}}

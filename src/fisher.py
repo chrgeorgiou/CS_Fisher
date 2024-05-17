@@ -41,8 +41,7 @@ def get_Cell_data_vector(cosmo: ccl.Cosmology,
                                             ia_bias=ia_bias)
             tracer2 = ccl.WeakLensingTracer(cosmo, dndz=(z, dndz_use[z2]),
                                             ia_bias=ia_bias)
-            c_ells[f'z{z1}-z{z2}'] = ccl.angular_cl(cosmo, tracer1, tracer2, ell,
-                                                    )#limber_integration_method='spline')
+            c_ells[f'z{z1}-z{z2}'] = ccl.angular_cl(cosmo, tracer1, tracer2, ell)
     return c_ells
 
 
@@ -142,7 +141,7 @@ def compute_SNR(c_ells: dict, covariance: np.ndarray) -> float:
 
 
 def compute_d_Cells(n_points: int,
-                    cosmo_params: dict, IA_params: dict, redshift_params: dict,
+                    cosmo_params: dict, astro_params: dict, redshift_params: dict,
                     z: np.ndarray, dndz: np.ndarray, ell: np.ndarray,
                     verbose: bool = False) -> np.ndarray:
     """
@@ -158,8 +157,9 @@ def compute_d_Cells(n_points: int,
             also contain the key "shift" with a LIST of values for the step-size
             of the derivatives for each of the parameters. If some parameter has
             a corresponding "None" shift, it is not being varied.
-        IA_params (dict): Similar to the one above but now contains the
-            intrinsic alignment parameter(s).
+        astro_params (dict): Similar to the one above but now contains the
+            astrophysical systematic parameter(s): intrinsic alignments (A_IA)
+            and baryonic feedback (logT_AGN).
         redshift_params (dict): Similar to the one above but now contains the
             shifts on the redshift distributions.
         z (array): The redshift values where the n(z) has been computed.
@@ -183,7 +183,7 @@ def compute_d_Cells(n_points: int,
     N_z_bins = dndz_use.shape[0]
     N_Cells = int(np.sum(np.arange(1, N_z_bins+1)))
     N_params_varied = int(np.count_nonzero(cosmo_params['shift']) +
-                          np.count_nonzero(IA_params['shift']) +
+                          np.count_nonzero(astro_params['shift']) +
                           np.count_nonzero(redshift_params['shift']))
     d_Cells = np.zeros((len(ell), N_params_varied, N_Cells))
 
@@ -201,8 +201,9 @@ def compute_d_Cells(n_points: int,
     step_coeff = np.arange(-(n_points // 2), n_points // 2 + 1, 1)
     step_coeff = step_coeff[step_coeff != 0]
 
-    params_fiducial = np.concatenate((cosmo_params['fiducial'], IA_params['fiducial'], redshift_params['fiducial']))
-    params_shift = np.concatenate((cosmo_params['shift'], IA_params['shift'], redshift_params['shift']))
+    params_fiducial = np.concatenate((cosmo_params['fiducial'], astro_params['fiducial'], redshift_params['fiducial']))
+    params_name = np.concatenate((cosmo_params['name'], astro_params['name'], redshift_params['name']))
+    params_shift = np.concatenate((cosmo_params['shift'], astro_params['shift'], redshift_params['shift']))
 
     di = 0
     for pi, p in enumerate(params_fiducial):
@@ -220,17 +221,30 @@ def compute_d_Cells(n_points: int,
                 cosmo_in_dict.pop('Omega_m')
 
             # Define the IA input parameters
-            A_IA_in = param_in[N_cosmo]
+            A_IA_in = param_in[np.in1d(params_name, 'A_IA')][0]
+
+            # Define the baryon feedback parameters
+            try:
+                logT_AGN_in = param_in[np.in1d(params_name, 'logT_AGN')][0]
+                if logT_AGN_in is not None:
+                    baryons_dict = {"kmax": 20.0,
+                                   "halofit_version": "mead2020_feedback",
+                                   "HMCode_logT_AGN": logT_AGN_in}
+                else: baryons_dict = {}
+            except:
+                baryons_dict = {}
 
             # Define the input redshift distributions
             dndz_in = dndz_use.copy()
-            if pi >= N_cosmo+1:
+            if pi >= len(params_fiducial)-N_z_bins:
                 delta_z_in = param_in[pi]
-                shifted_bin = pi-(N_cosmo+1)
+                shifted_bin = pi-(len(params_fiducial)-N_z_bins)
                 interp_dndz = interp1d(z, dndz_use[shifted_bin], bounds_error=False, fill_value=0)
                 dndz_in[shifted_bin] = interp_dndz(z + delta_z_in)
 
-            cosmo_in = ccl.Cosmology(**cosmo_in_dict, extra_parameters={"camb": {"dark_energy_model": "ppf"}})
+            cosmo_in = ccl.Cosmology(**cosmo_in_dict,
+                                     matter_power_spectrum='camb',
+                                     extra_parameters={"camb": {"dark_energy_model": "ppf"} | baryons_dict})
             C_ells = get_Cell_data_vector(cosmo_in, z, dndz_in, A_IA_in, ell)
             d_Cells[:, di, :] += coeff[n] * np.array(list(C_ells.values())).T / params_shift[pi]
         di += 1
@@ -304,7 +318,7 @@ class fisher_matrix(object):
             self.SNR = compute_SNR(self.C_ell, self.data_covariance)
             self.d_C_ell = compute_d_Cells(n_points=self.n_points,
                                            cosmo_params=self.cosmo_params,
-                                           IA_params=self.IA_params,
+                                           astro_params=self.IA_params,
                                            redshift_params=self.redshift_params,
                                            z=self.z, dndz=self.dndz, ell=self.ell)
             self.fisher_matrix = compute_Fisher_matrix(self.d_C_ell, self.data_covariance)
@@ -486,7 +500,7 @@ class fisher_matrix(object):
                 try:
                     d_Cell_shift = compute_d_Cells(self.n_points,
                                                    cosmo_params=cosmo_params_shift,
-                                                   IA_params=IA_params_shift,
+                                                   astro_params=IA_params_shift,
                                                    redshift_params=redshift_params_shift,
                                                    z=self.z, dndz=self.dndz, ell=self.ell)
                 except:
