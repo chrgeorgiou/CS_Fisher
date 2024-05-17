@@ -16,12 +16,12 @@ def main(config):
                           wa=config.cosmology.wa)
 
     # ell binning setup
-    SRD_ell_bins = np.geomspace(config.ell_binning.cosmic_shear.bin_start,
+    ell_bins = np.geomspace(config.ell_binning.cosmic_shear.bin_start,
                                 config.ell_binning.cosmic_shear.bin_end,
-                                config.ell_binning.cosmic_shear.N_bins)
-    ell_bins = SRD_ell_bins[
-        (SRD_ell_bins >= config.ell_binning.cosmic_shear.ell_min) &
-        (SRD_ell_bins <= config.ell_binning.cosmic_shear.ell_max)
+                                config.ell_binning.cosmic_shear.N_bins+1)
+    ell_bins = ell_bins[
+        (ell_bins >= config.ell_binning.cosmic_shear.ell_min) &
+        (ell_bins <= config.ell_binning.cosmic_shear.ell_max)
         ].astype(int)
     ell_arr = np.array([(a + b) / 2 for a, b in pairwise(ell_bins)]).astype(int)
     Delta_ell = np.array([b - a for a, b in pairwise(ell_bins)])

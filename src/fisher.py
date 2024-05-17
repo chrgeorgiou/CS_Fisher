@@ -65,7 +65,6 @@ def get_covariance(ell: np.ndarray, c_ells: dict,
         -> np.ndarray:
     """
     Computes the Gaussian shape-noise covariance terms of the given C_ell's.
-    Assumes equipopulated redshift bins.
 
     Args:
         ell (array): Values of ell multipoles where the C_ell's have been computed.
@@ -81,9 +80,9 @@ def get_covariance(ell: np.ndarray, c_ells: dict,
 
     Returns:
         covariance (np.ndarray): A 3-dimensional array where the first axis
-        contains the numerical value of the covariance for the given ell's,
-        and the second and third axes contain the two combination of redshift
-        bins correlated.
+            contains the numerical value of the covariance for the given ell's,
+            and the second and third axes contain the two combination of redshift
+            bins correlated.
     """
     n_bar = np.atleast_1d(n_bar)
     n_z_bins = get_nt_nz(c_ells)
