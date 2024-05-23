@@ -277,8 +277,15 @@ class fisher_matrix(object):
     def __init__(self, *, cosmo=None, z=None, dndz=None,
                  ell=None, sigma_e=None, n_bar=None, fsky=None,
                  Delta_ell=None, n_points=3,
-                 cosmo_params=None, IA_params=None, redshift_params=None,
-                 fisher_from_input=None):
+                 cosmo_params=None, astro_params=None, redshift_params=None,
+                 fisher_from_input=None,
+                 IA_params=None):
+
+        if IA_params is not None:
+            warnings.warn('IA_params is deprecated and will be removed. Change to "astro_params" instead.',
+                          DeprecationWarning, stacklevel=2)
+            astro_params = IA_params
+
         self.cosmo = cosmo
         self.z = z
         self.dndz = dndz
@@ -289,22 +296,22 @@ class fisher_matrix(object):
         self.Delta_ell = Delta_ell
         self.n_points = n_points
         self.cosmo_params = cosmo_params
-        self.IA_params = IA_params
+        self.astro_params = astro_params
         self.redshift_params = redshift_params
         self.fisher_from_input = fisher_from_input
 
         if cosmo_params is None:
             self.cosmo_params = {'name': [], 'fiducial': [], 'shift': []}
-        if IA_params is None:
-            self.IA_params = {'name': ['A_IA'], 'fiducial': [None], 'shift': [None]}
+        if astro_params is None:
+            self.astro_params = {'name': ['A_IA'], 'fiducial': [None], 'shift': [None]}
         if redshift_params is None:
             self.redshift_params = {'name': [], 'fiducial': [], 'shift': []}
 
         assert all(s in self.cosmo_params for s in ['name', 'fiducial']) and \
-               all(s in self.IA_params for s in ['name', 'fiducial']) and \
+               all(s in self.astro_params for s in ['name', 'fiducial']) and \
                all(s in self.redshift_params for s in ['name', 'fiducial'])
-        A_IA = self.IA_params['fiducial'][0]
-        for param_dict in [self.cosmo_params, self.IA_params, self.redshift_params]:
+        A_IA = np.array(self.astro_params['fiducial'])[np.in1d(self.astro_params['name'], 'A_IA')][0]
+        for param_dict in [self.cosmo_params, self.astro_params, self.redshift_params]:
             if 'latex' not in param_dict:
                 param_dict['latex'] = param_dict['name']
             if 'shift' not in param_dict:
@@ -318,7 +325,7 @@ class fisher_matrix(object):
             self.SNR = compute_SNR(self.C_ell, self.data_covariance)
             self.d_C_ell = compute_d_Cells(n_points=self.n_points,
                                            cosmo_params=self.cosmo_params,
-                                           astro_params=self.IA_params,
+                                           astro_params=self.astro_params,
                                            redshift_params=self.redshift_params,
                                            z=self.z, dndz=self.dndz, ell=self.ell)
             self.fisher_matrix = compute_Fisher_matrix(self.d_C_ell, self.data_covariance)
@@ -326,20 +333,20 @@ class fisher_matrix(object):
             self.fisher_matrix = fisher_from_input
 
         params_shift = np.concatenate((self.cosmo_params['shift'],
-                                       self.IA_params['shift'],
+                                       self.astro_params['shift'],
                                        self.redshift_params['shift']))
         ids_varied = np.where(params_shift != None)[0]
 
         self.parameters = np.concatenate((self.cosmo_params['name'],
-                                          self.IA_params['name'],
+                                          self.astro_params['name'],
                                           self.redshift_params['name'])
                                          )[ids_varied]
         self.fiducial_parameters = np.concatenate((self.cosmo_params['fiducial'],
-                                                   self.IA_params['fiducial'],
+                                                   self.astro_params['fiducial'],
                                                    self.redshift_params['fiducial'])
                                                   )[ids_varied]
         self.latex_parameters = np.concatenate((self.cosmo_params['latex'],
-                                                self.IA_params['latex'],
+                                                self.astro_params['latex'],
                                                 self.redshift_params['latex'])
                                                )[ids_varied]
         self.covariance = np.linalg.inv(self.fisher_matrix)
@@ -489,10 +496,10 @@ class fisher_matrix(object):
             for pi, p in enumerate(shift_parameters):
 
                 cosmo_params_shift = self.cosmo_params.copy()
-                IA_params_shift = self.IA_params.copy()
+                astro_params_shift = self.astro_params.copy()
                 redshift_params_shift = self.redshift_params.copy()
 
-                for param_dict in [cosmo_params_shift, IA_params_shift, redshift_params_shift]:
+                for param_dict in [cosmo_params_shift, astro_params_shift, redshift_params_shift]:
                     param_dict['shift'] = [None]*len(param_dict['name'])
                     if p in param_dict['name']:
                         pi_where = np.in1d(param_dict['name'], p).nonzero()[0][0]
@@ -500,7 +507,7 @@ class fisher_matrix(object):
                 try:
                     d_Cell_shift = compute_d_Cells(self.n_points,
                                                    cosmo_params=cosmo_params_shift,
-                                                   astro_params=IA_params_shift,
+                                                   astro_params=astro_params_shift,
                                                    redshift_params=redshift_params_shift,
                                                    z=self.z, dndz=self.dndz, ell=self.ell)
                 except:
@@ -513,7 +520,7 @@ class fisher_matrix(object):
                 fisher_shift = fisher_matrix(fisher_from_input=compute_Fisher_matrix(d_Cell_fiducial,
                                                                                      self.data_covariance),
                                              cosmo_params=self.cosmo_params,
-                                             IA_params=self.IA_params,
+                                             astro_params=self.astro_params,
                                              redshift_params=self.redshift_params)
                 try: fisher_shift.add_prior(self.priors[0], self.priors[1])
                 except: pass

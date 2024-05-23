@@ -47,9 +47,9 @@ def load_fisher_matrix(config: DictAsMember,
                        'latex': ['$\Delta z_{%i}$' % (i + 1) for i in range(N_z_bins)]}
 
     fisher_matrix_object = fisher_matrix(fisher_from_input=fisher_matrix_array,
-                                     cosmo_params=cosmo_params,
-                                     IA_params=astro_params,
-                                     redshift_params=redshift_params)
+                                         cosmo_params=cosmo_params,
+                                         astro_params=astro_params,
+                                         redshift_params=redshift_params)
     return fisher_matrix_object
 
 

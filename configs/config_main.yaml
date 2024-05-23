@@ -33,8 +33,8 @@ step_size:
     n_s:
     w0: 0.01
     wa: 0.01
-    A_IA: 0.01
     logT_AGN: 0.01
+    A_IA: 0.01
     delta_z: 0.02
 
 ell_binning:

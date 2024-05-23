@@ -61,7 +61,7 @@ def main(config):
                        n_bar=config.redshift_distributions.sources.nbar,
                        fsky=config.forecast.fsky, Delta_ell=Delta_ell,
                        n_points=3, cosmo_params=cosmo_params,
-                       IA_params=astro_params, redshift_params=redshift_params)
+                       astro_params=astro_params, redshift_params=redshift_params)
     # Add Gaussian photo-z priors
     mean_z = np.trapz(nz_arr * z_arr, z_arr)
     scale_z = config.redshift_distributions.sources.sigma_delta_z*(1+mean_z)
