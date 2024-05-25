@@ -359,6 +359,36 @@ class fisher_matrix(object):
         keys_indices = np.arange(len(self.parameters))[np.in1d(self.parameters, keys_in)]
         return self.fisher_matrix[np.ix_(keys_indices, keys_indices)]
 
+    def fix_parameters(self, parameters):
+        parameters_in = np.atleast_1d(parameters)
+        assert all(s in self.parameters for s in parameters_in)
+        keys_indices = np.arange(len(self.parameters))[~np.in1d(self.parameters, parameters_in)]
+
+        ret = self.copy()
+        ret.fisher_matrix = self.fisher_matrix[np.ix_(keys_indices, keys_indices)]
+        ret.covariance = np.linalg.inv(ret.fisher_matrix)
+        ret.d_C_ell = ret.d_C_ell[:, keys_indices, :]
+
+        ret.parameters = ret.parameters[keys_indices]
+        ret.fiducial_parameters = ret.fiducial_parameters[keys_indices]
+        ret.latex_parameters = ret.latex_parameters[keys_indices]
+
+        ret.cosmo_params = None
+        ret.astro_params = None
+        ret.redshift_params = None
+
+        return ret
+
+    def copy(self):
+        fm = fisher_matrix.__new__(fisher_matrix)
+        for key, item in self.__dict__.items():
+            if isinstance(item, np.ndarray):
+                # Only items that might change need to be deep-copied.
+                fm.__dict__[key] = item.copy()
+            else:
+                fm.__dict__[key] = item
+        return fm
+
     def add_prior(self, parameters: {str, iter},
                   sigma_parameters: {float, iter}):
         """
@@ -484,6 +514,9 @@ class fisher_matrix(object):
         """
         if self.fisher_from_input is not None:
             raise ValueError('Cannot validate fisher matrix given from input.')
+        if self.cosmo_params is None:
+            raise ValueError('Cannot validate fisher matrix that has been copied, '
+                             'or that has no cosmology parameters.')
         if shifts is None:
             shifts = np.geomspace(1e-3, 1e-1, 10)
         if shift_parameters is None:
