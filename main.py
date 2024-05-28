@@ -41,16 +41,16 @@ def main(config):
     # Define the fisher matrix setup
     cosmo_params = {'name': list(config.cosmology.keys()),
                     'fiducial': list(config.cosmology.values()),
-                    'shift': [config.step_size[x] for x in list(config.cosmology.keys())],
+                    'shift': [config.derivatives.step_size[x] for x in list(config.cosmology.keys())],
                     'latex': ['$\Omega_\mathrm{m}$', '$\Omega_\mathrm{b}$', '$h$',
                               '$\sigma_8$', '$n_\mathrm{s}$', r'$w_0$', r'$w_a$']}
     IA_params = {'name': list(config.IA.keys()),
                  'fiducial': list(config.IA.values()),
-                 'shift': [config.step_size[x] for x in list(config.IA.keys())],
+                 'shift': [config.derivatives.step_size[x] for x in list(config.IA.keys())],
                  'latex': ['$A_\mathrm{IA}$']}
     redshift_params = {'name': [f'dz{i+1}' for i in range(N_z_bins)],
                        'fiducial': [0.] * N_z_bins,
-                       'shift': [config.step_size.delta_z] * N_z_bins,
+                       'shift': [config.derivatives.step_size.delta_z] * N_z_bins,
                        'latex': ['$\Delta z_{%i}$' % (i + 1) for i in range(N_z_bins)]}
 
     # Compute the fisher matrix
@@ -59,7 +59,7 @@ def main(config):
                        sigma_e=sigma_e,
                        n_bar=config.redshift_distributions.sources.nbar,
                        fsky=config.forecast.fsky, Delta_ell=Delta_ell,
-                       n_points=3, cosmo_params=cosmo_params,
+                       n_points=config.derivatives.stencil_points, cosmo_params=cosmo_params,
                        IA_params=IA_params, redshift_params=redshift_params)
     # Add Gaussian photo-z priors
     mean_z = np.trapz(nz_arr * z_arr, z_arr)
@@ -69,7 +69,7 @@ def main(config):
     # Fisher matrix validation
     print(f'Producing fisher matrix validation plot.')
     shifts = np.geomspace(5e-3, 3e-1, 16)
-    FoM_parameters = config.validation
+    FoM_parameters = config.derivatives.validation
     FoM_validation = fm.validate_fisher_matrix(shifts, FoM_parameters)
 
     print(f'Writing output.')

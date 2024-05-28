@@ -34,16 +34,16 @@ def load_fisher_matrix(config: DictAsMember,
 
     cosmo_params = {'name': list(config.cosmology.keys()),
                     'fiducial': list(config.cosmology.values()),
-                    'shift': [config.step_size[x] for x in list(config.cosmology.keys())],
+                    'shift': [config.derivatives.step_size[x] for x in list(config.cosmology.keys())],
                     'latex': ['$\Omega_\mathrm{m}$', '$\Omega_\mathrm{b}$', '$h$',
                               '$\sigma_8$', '$n_\mathrm{s}$', r'$w_0$', r'$w_a$']}
     IA_params = {'name': list(config.IA.keys()),
                  'fiducial': list(config.IA.values()),
-                 'shift': [config.step_size[x] for x in list(config.IA.keys())],
+                 'shift': [config.derivatives.step_size[x] for x in list(config.IA.keys())],
                  'latex': ['$A_\mathrm{IA}$']}
     redshift_params = {'name': [f'dz{i+1}' for i in range(N_z_bins)],
                        'fiducial': [0.] * N_z_bins,
-                       'shift': [config.step_size.delta_z] * N_z_bins,
+                       'shift': [config.derivatives.step_size.delta_z] * N_z_bins,
                        'latex': ['$\Delta z_{%i}$' % (i + 1) for i in range(N_z_bins)]}
 
     fisher_matrix_object = fisher_matrix(fisher_from_input=fisher_matrix_array,
