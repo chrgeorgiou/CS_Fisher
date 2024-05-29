@@ -21,18 +21,18 @@ IA:
     A_IA: 1.0
 
 derivatives:
-    validation: [w0, wa]
+    validation: [Omega_m, sigma8]
     stencil_points: 3
     step_size:
         Omega_m: 0.01
         Omega_b:
         h:
-        sigma8: 0.05
+        sigma8: 0.01
         n_s:
-        w0: 0.07
-        wa: 0.3
+        w0: 0.02
+        wa:
         A_IA: 0.01
-        delta_z: 0.02
+        delta_z:
 
 ell_binning:
     cosmic_shear:
@@ -43,7 +43,7 @@ ell_binning:
         ell_max: 2000
 
 forecast:
-    fsky: 0.43
+    fsky: 0.4
     e_rms: 0.26
     year: 1
     z_min: 0.1

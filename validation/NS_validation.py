@@ -62,8 +62,8 @@ cosmo = ccl.Cosmology(Omega_c=config.cosmology.Omega_m-config.cosmology.Omega_b,
 
 # ell binning setup
 ell_bins = np.geomspace(config.ell_binning.cosmic_shear.bin_start,
-                            config.ell_binning.cosmic_shear.bin_end,
-                            config.ell_binning.cosmic_shear.N_bins+1)
+                        config.ell_binning.cosmic_shear.bin_end,
+                        config.ell_binning.cosmic_shear.N_bins+1)
 ell_bins = ell_bins[
     (ell_bins >= config.ell_binning.cosmic_shear.ell_min) &
     (ell_bins <= config.ell_binning.cosmic_shear.ell_max)
@@ -136,12 +136,13 @@ for ip, p in enumerate(config.sampling_validation.keys()):
         continue
     elif len(config.sampling_validation[p]) == 2:
         prior.add_parameter(p, dist=tuple(config.sampling_validation[p]))
-    elif p=='delta_z':
+    elif p == 'delta_z':
         for i in range(N_z_bins):
             prior.add_parameter(f'dz_{i + 1}', dist=norm(loc=0.0,
                 scale=config.redshift_distributions.sources.sigma_delta_z*(1 + mean_z[i])))
     else:
         raise ValueError(f'Input parameter in config file had problem: {p}')
+
 
 # Likelihood
 def likelihood(param_dict):
@@ -151,24 +152,25 @@ def likelihood(param_dict):
         if config.sampling_validation[p] is None:
             if p in config.cosmology.keys():
                 cosmo_in_dict[p] = config.cosmology[p]
-            elif p=='A_IA':
+            elif p == 'A_IA':
                 A_IA_in = None
-            elif p=='delta_z':
+            # TODO: Add the baryons here
+            elif p == 'delta_z':
                 dndz_in = nz_arr
             continue
         else:
             if p in config.cosmology.keys():
                 cosmo_in_dict[p] = 1.*param_dict[p]
-            elif p=='A_IA':
+            elif p == 'A_IA':
                 A_IA_in = 1.*param_dict['A_IA']
             # TODO: Add the baryons here
-            elif p=='delta_z':
+            elif p == 'delta_z':
                 dndz_in = np.zeros(nz_arr.shape)
                 for i in range(N_z_bins):
                     interp_dndz = interp1d(z_arr, nz_arr[i], bounds_error=False, fill_value=0)
                     dndz_in[i] = interp_dndz(z_arr + 1.*param_dict[f'dz_{i+1}'])
 
-    if cosmo_in_dict['w0']+cosmo_in_dict['wa']>0:
+    if cosmo_in_dict['w0']+cosmo_in_dict['wa'] > 0:
         return -np.inf
     if 'Omega_m' in cosmo_in_dict.keys():
         cosmo_in_dict['Omega_c'] = cosmo_in_dict['Omega_m'] - cosmo_in_dict['Omega_b']
