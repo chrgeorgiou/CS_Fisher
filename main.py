@@ -13,7 +13,8 @@ def main(config):
                           sigma8=config.cosmology.sigma8,
                           n_s=config.cosmology.n_s,
                           w0=config.cosmology.w0,
-                          wa=config.cosmology.wa)
+                          wa=config.cosmology.wa,
+                          extra_parameters = {"camb": config.baryons_dict})
 
     # ell binning setup
     ell_bins = np.geomspace(config.ell_binning.cosmic_shear.bin_start,
@@ -44,10 +45,10 @@ def main(config):
                     'shift': [config.derivatives.step_size[x] for x in list(config.cosmology.keys())],
                     'latex': ['$\Omega_\mathrm{m}$', '$\Omega_\mathrm{b}$', '$h$',
                               '$\sigma_8$', '$n_\mathrm{s}$', r'$w_0$', r'$w_a$']}
-    IA_params = {'name': list(config.IA.keys()),
-                 'fiducial': list(config.IA.values()),
-                 'shift': [config.derivatives.step_size[x] for x in list(config.IA.keys())],
-                 'latex': ['$A_\mathrm{IA}$']}
+    astro_params = {'name': list(config.IA.keys())+list(config.baryons.keys()),
+                 'fiducial': list(config.IA.values())+list(config.baryons.values()),
+                 'shift': [config.derivatives.step_size[x] for x in list(config.IA.keys())+list(config.baryons.keys())],
+                 'latex': ['$A_\mathrm{IA}$', '$\log T_\mathrm{AGN}$']}
     redshift_params = {'name': [f'dz{i+1}' for i in range(N_z_bins)],
                        'fiducial': [0.] * N_z_bins,
                        'shift': [config.derivatives.step_size.delta_z] * N_z_bins,
@@ -60,7 +61,7 @@ def main(config):
                        n_bar=config.redshift_distributions.sources.nbar,
                        fsky=config.forecast.fsky, Delta_ell=Delta_ell,
                        n_points=config.derivatives.stencil_points, cosmo_params=cosmo_params,
-                       IA_params=IA_params, redshift_params=redshift_params)
+                       astro_params=astro_params, redshift_params=redshift_params)
     # Add Gaussian photo-z priors
     mean_z = np.trapz(nz_arr * z_arr, z_arr)
     scale_z = config.redshift_distributions.sources.sigma_delta_z*(1+mean_z)

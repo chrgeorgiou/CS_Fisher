@@ -41,8 +41,7 @@ def get_Cell_data_vector(cosmo: ccl.Cosmology,
                                             ia_bias=ia_bias)
             tracer2 = ccl.WeakLensingTracer(cosmo, dndz=(z, dndz_use[z2]),
                                             ia_bias=ia_bias)
-            c_ells[f'z{z1}-z{z2}'] = ccl.angular_cl(cosmo, tracer1, tracer2, ell,
-                                                    )#limber_integration_method='spline')
+            c_ells[f'z{z1}-z{z2}'] = ccl.angular_cl(cosmo, tracer1, tracer2, ell)
     return c_ells
 
 
@@ -142,7 +141,7 @@ def compute_SNR(c_ells: dict, covariance: np.ndarray) -> float:
 
 
 def compute_d_Cells(n_points: int,
-                    cosmo_params: dict, IA_params: dict, redshift_params: dict,
+                    cosmo_params: dict, astro_params: dict, redshift_params: dict,
                     z: np.ndarray, dndz: np.ndarray, ell: np.ndarray,
                     verbose: bool = False) -> np.ndarray:
     """
@@ -158,8 +157,9 @@ def compute_d_Cells(n_points: int,
             also contain the key "shift" with a LIST of values for the step-size
             of the derivatives for each of the parameters. If some parameter has
             a corresponding "None" shift, it is not being varied.
-        IA_params (dict): Similar to the one above but now contains the
-            intrinsic alignment parameter(s).
+        astro_params (dict): Similar to the one above but now contains the
+            astrophysical systematic parameter(s): intrinsic alignments (A_IA)
+            and baryonic feedback (logT_AGN).
         redshift_params (dict): Similar to the one above but now contains the
             shifts on the redshift distributions.
         z (array): The redshift values where the n(z) has been computed.
@@ -183,7 +183,7 @@ def compute_d_Cells(n_points: int,
     N_z_bins = dndz_use.shape[0]
     N_Cells = int(np.sum(np.arange(1, N_z_bins+1)))
     N_params_varied = int(np.count_nonzero(cosmo_params['shift']) +
-                          np.count_nonzero(IA_params['shift']) +
+                          np.count_nonzero(astro_params['shift']) +
                           np.count_nonzero(redshift_params['shift']))
     d_Cells = np.zeros((len(ell), N_params_varied, N_Cells))
 
@@ -201,8 +201,9 @@ def compute_d_Cells(n_points: int,
     step_coeff = np.arange(-(n_points // 2), n_points // 2 + 1, 1)
     step_coeff = step_coeff[step_coeff != 0]
 
-    params_fiducial = np.concatenate((cosmo_params['fiducial'], IA_params['fiducial'], redshift_params['fiducial']))
-    params_shift = np.concatenate((cosmo_params['shift'], IA_params['shift'], redshift_params['shift']))
+    params_fiducial = np.concatenate((cosmo_params['fiducial'], astro_params['fiducial'], redshift_params['fiducial']))
+    params_name = np.concatenate((cosmo_params['name'], astro_params['name'], redshift_params['name']))
+    params_shift = np.concatenate((cosmo_params['shift'], astro_params['shift'], redshift_params['shift']))
 
     di = 0
     for pi, p in enumerate(params_fiducial):
@@ -220,17 +221,30 @@ def compute_d_Cells(n_points: int,
                 cosmo_in_dict.pop('Omega_m')
 
             # Define the IA input parameters
-            A_IA_in = param_in[N_cosmo]
+            A_IA_in = param_in[np.in1d(params_name, 'A_IA')][0]
+
+            # Define the baryon feedback parameters
+            try:
+                logT_AGN_in = param_in[np.in1d(params_name, 'logT_AGN')][0]
+                if logT_AGN_in is not None:
+                    baryons_dict = {"kmax": 20.0,
+                                   "halofit_version": "mead2020_feedback",
+                                   "HMCode_logT_AGN": logT_AGN_in}
+                else: baryons_dict = {}
+            except:
+                baryons_dict = {}
 
             # Define the input redshift distributions
             dndz_in = dndz_use.copy()
-            if pi >= N_cosmo+1:
+            if pi >= len(params_fiducial)-N_z_bins:
                 delta_z_in = param_in[pi]
-                shifted_bin = pi-(N_cosmo+1)
+                shifted_bin = pi-(len(params_fiducial)-N_z_bins)
                 interp_dndz = interp1d(z, dndz_use[shifted_bin], bounds_error=False, fill_value=0)
                 dndz_in[shifted_bin] = interp_dndz(z + delta_z_in)
 
-            cosmo_in = ccl.Cosmology(**cosmo_in_dict, extra_parameters={"camb": {"dark_energy_model": "ppf"}})
+            cosmo_in = ccl.Cosmology(**cosmo_in_dict,
+                                     matter_power_spectrum='camb',
+                                     extra_parameters={"camb": {"dark_energy_model": "ppf"} | baryons_dict})
             C_ells = get_Cell_data_vector(cosmo_in, z, dndz_in, A_IA_in, ell)
             d_Cells[:, di, :] += coeff[n] * np.array(list(C_ells.values())).T / params_shift[pi]
         di += 1
@@ -263,8 +277,15 @@ class fisher_matrix(object):
     def __init__(self, *, cosmo=None, z=None, dndz=None,
                  ell=None, sigma_e=None, n_bar=None, fsky=None,
                  Delta_ell=None, n_points=3,
-                 cosmo_params=None, IA_params=None, redshift_params=None,
-                 fisher_from_input=None):
+                 cosmo_params=None, astro_params=None, redshift_params=None,
+                 fisher_from_input=None,
+                 IA_params=None):
+
+        if IA_params is not None:
+            warnings.warn('IA_params is deprecated and will be removed. Change to "astro_params" instead.',
+                          DeprecationWarning, stacklevel=2)
+            astro_params = IA_params
+
         self.cosmo = cosmo
         self.z = z
         self.dndz = dndz
@@ -275,22 +296,22 @@ class fisher_matrix(object):
         self.Delta_ell = Delta_ell
         self.n_points = n_points
         self.cosmo_params = cosmo_params
-        self.IA_params = IA_params
+        self.astro_params = astro_params
         self.redshift_params = redshift_params
         self.fisher_from_input = fisher_from_input
 
         if cosmo_params is None:
             self.cosmo_params = {'name': [], 'fiducial': [], 'shift': []}
-        if IA_params is None:
-            self.IA_params = {'name': ['A_IA'], 'fiducial': [None], 'shift': [None]}
+        if astro_params is None:
+            self.astro_params = {'name': ['A_IA'], 'fiducial': [None], 'shift': [None]}
         if redshift_params is None:
             self.redshift_params = {'name': [], 'fiducial': [], 'shift': []}
 
         assert all(s in self.cosmo_params for s in ['name', 'fiducial']) and \
-               all(s in self.IA_params for s in ['name', 'fiducial']) and \
+               all(s in self.astro_params for s in ['name', 'fiducial']) and \
                all(s in self.redshift_params for s in ['name', 'fiducial'])
-        A_IA = self.IA_params['fiducial'][0]
-        for param_dict in [self.cosmo_params, self.IA_params, self.redshift_params]:
+        A_IA = np.array(self.astro_params['fiducial'])[np.in1d(self.astro_params['name'], 'A_IA')][0]
+        for param_dict in [self.cosmo_params, self.astro_params, self.redshift_params]:
             if 'latex' not in param_dict:
                 param_dict['latex'] = param_dict['name']
             if 'shift' not in param_dict:
@@ -304,7 +325,7 @@ class fisher_matrix(object):
             self.SNR = compute_SNR(self.C_ell, self.data_covariance)
             self.d_C_ell = compute_d_Cells(n_points=self.n_points,
                                            cosmo_params=self.cosmo_params,
-                                           IA_params=self.IA_params,
+                                           astro_params=self.astro_params,
                                            redshift_params=self.redshift_params,
                                            z=self.z, dndz=self.dndz, ell=self.ell)
             self.fisher_matrix = compute_Fisher_matrix(self.d_C_ell, self.data_covariance)
@@ -312,20 +333,20 @@ class fisher_matrix(object):
             self.fisher_matrix = fisher_from_input
 
         params_shift = np.concatenate((self.cosmo_params['shift'],
-                                       self.IA_params['shift'],
+                                       self.astro_params['shift'],
                                        self.redshift_params['shift']))
         ids_varied = np.where(params_shift != None)[0]
 
         self.parameters = np.concatenate((self.cosmo_params['name'],
-                                          self.IA_params['name'],
+                                          self.astro_params['name'],
                                           self.redshift_params['name'])
                                          )[ids_varied]
         self.fiducial_parameters = np.concatenate((self.cosmo_params['fiducial'],
-                                                   self.IA_params['fiducial'],
+                                                   self.astro_params['fiducial'],
                                                    self.redshift_params['fiducial'])
                                                   )[ids_varied]
         self.latex_parameters = np.concatenate((self.cosmo_params['latex'],
-                                                self.IA_params['latex'],
+                                                self.astro_params['latex'],
                                                 self.redshift_params['latex'])
                                                )[ids_varied]
         self.covariance = np.linalg.inv(self.fisher_matrix)
@@ -337,6 +358,36 @@ class fisher_matrix(object):
 
         keys_indices = np.arange(len(self.parameters))[np.in1d(self.parameters, keys_in)]
         return self.fisher_matrix[np.ix_(keys_indices, keys_indices)]
+
+    def fix_parameters(self, parameters):
+        parameters_in = np.atleast_1d(parameters)
+        assert all(s in self.parameters for s in parameters_in)
+        keys_indices = np.arange(len(self.parameters))[~np.in1d(self.parameters, parameters_in)]
+
+        ret = self.copy()
+        ret.fisher_matrix = self.fisher_matrix[np.ix_(keys_indices, keys_indices)]
+        ret.covariance = np.linalg.inv(ret.fisher_matrix)
+        ret.d_C_ell = ret.d_C_ell[:, keys_indices, :]
+
+        ret.parameters = ret.parameters[keys_indices]
+        ret.fiducial_parameters = ret.fiducial_parameters[keys_indices]
+        ret.latex_parameters = ret.latex_parameters[keys_indices]
+
+        ret.cosmo_params = None
+        ret.astro_params = None
+        ret.redshift_params = None
+
+        return ret
+
+    def copy(self):
+        fm = fisher_matrix.__new__(fisher_matrix)
+        for key, item in self.__dict__.items():
+            if isinstance(item, np.ndarray):
+                # Only items that might change need to be deep-copied.
+                fm.__dict__[key] = item.copy()
+            else:
+                fm.__dict__[key] = item
+        return fm
 
     def add_prior(self, parameters: {str, iter},
                   sigma_parameters: {float, iter}):
@@ -463,6 +514,9 @@ class fisher_matrix(object):
         """
         if self.fisher_from_input is not None:
             raise ValueError('Cannot validate fisher matrix given from input.')
+        if self.cosmo_params is None:
+            raise ValueError('Cannot validate fisher matrix that has been copied, '
+                             'or that has no cosmology parameters.')
         if shifts is None:
             shifts = np.geomspace(1e-3, 1e-1, 10)
         if shift_parameters is None:
@@ -475,10 +529,10 @@ class fisher_matrix(object):
             for pi, p in enumerate(shift_parameters):
 
                 cosmo_params_shift = self.cosmo_params.copy()
-                IA_params_shift = self.IA_params.copy()
+                astro_params_shift = self.astro_params.copy()
                 redshift_params_shift = self.redshift_params.copy()
 
-                for param_dict in [cosmo_params_shift, IA_params_shift, redshift_params_shift]:
+                for param_dict in [cosmo_params_shift, astro_params_shift, redshift_params_shift]:
                     param_dict['shift'] = [None]*len(param_dict['name'])
                     if p in param_dict['name']:
                         pi_where = np.in1d(param_dict['name'], p).nonzero()[0][0]
@@ -486,7 +540,7 @@ class fisher_matrix(object):
                 try:
                     d_Cell_shift = compute_d_Cells(self.n_points,
                                                    cosmo_params=cosmo_params_shift,
-                                                   IA_params=IA_params_shift,
+                                                   astro_params=astro_params_shift,
                                                    redshift_params=redshift_params_shift,
                                                    z=self.z, dndz=self.dndz, ell=self.ell)
                 except:
@@ -499,7 +553,7 @@ class fisher_matrix(object):
                 fisher_shift = fisher_matrix(fisher_from_input=compute_Fisher_matrix(d_Cell_fiducial,
                                                                                      self.data_covariance),
                                              cosmo_params=self.cosmo_params,
-                                             IA_params=self.IA_params,
+                                             astro_params=self.astro_params,
                                              redshift_params=self.redshift_params)
                 try: fisher_shift.add_prior(self.priors[0], self.priors[1])
                 except: pass
