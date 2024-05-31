@@ -1,4 +1,4 @@
-name: IA
+name: baryons
 
 paths:
     # Add below the directory of the project.
@@ -18,10 +18,10 @@ cosmology:
     wa: 0
 
 baryons:
-    logT_AGN:
+    logT_AGN: 7.6
 
 IA:
-    A_IA: 0.1
+    A_IA:
 
 derivatives:
     validation: [Omega_m, sigma8]
@@ -34,8 +34,8 @@ derivatives:
         n_s:
         w0: 0.01
         wa:
-        logT_AGN:
-        A_IA: 0.01
+        logT_AGN: 0.01
+        A_IA:
         delta_z:
 
 ell_binning:
