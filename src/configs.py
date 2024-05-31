@@ -76,4 +76,5 @@ def baryons_dictionary(config):
             if config['baryons']['logT_AGN'] is None:
                 return {"baryons_dict": {}}
             else:
-                return {"baryons_dict": {"kmax": 20.0, "halofit_version": "mead2020_feedback", "HMCode_logT_AGN": logT_AGN}}
+                return {"baryons_dict": {"kmax": 20.0, "halofit_version": "mead2020_feedback",
+                                         "HMCode_logT_AGN": config['baryons']['logT_AGN']}}

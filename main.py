@@ -14,6 +14,7 @@ def main(config):
                           n_s=config.cosmology.n_s,
                           w0=config.cosmology.w0,
                           wa=config.cosmology.wa,
+                          matter_power_spectrum='camb',
                           extra_parameters = {"camb": config.baryons_dict})
 
     # ell binning setup

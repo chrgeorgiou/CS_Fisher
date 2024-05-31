@@ -57,8 +57,9 @@ cosmo = ccl.Cosmology(Omega_c=config.cosmology.Omega_m-config.cosmology.Omega_b,
                       sigma8=config.cosmology.sigma8,
                       n_s=config.cosmology.n_s,
                       w0=config.cosmology.w0,
-                      wa=config.cosmology.wa)
-# TODO: Add the baryons here
+                      wa=config.cosmology.wa,
+                      matter_power_spectrum='camb',
+                      extra_parameters={"camb": config.baryons_dict})
 
 # ell binning setup
 ell_bins = np.geomspace(config.ell_binning.cosmic_shear.bin_start,
@@ -89,11 +90,10 @@ cosmo_params = {'name': list(config.cosmology.keys()),
                 'shift': [config.derivatives.step_size[x] for x in list(config.cosmology.keys())],
                 'latex': ['$\Omega_\mathrm{m}$', '$\Omega_\mathrm{b}$', '$h$',
                           '$\sigma_8$', '$n_\mathrm{s}$', r'$w_0$', r'$w_a$']}
-# TODO: Update here with astro_params
-IA_params = {'name': list(config.IA.keys()),
-             'fiducial': list(config.IA.values()),
-             'shift': [config.derivatives.step_size[x] for x in list(config.IA.keys())],
-             'latex': ['$A_\mathrm{IA}$']}
+astro_params = {'name': list(config.IA.keys())+list(config.baryons.keys()),
+                 'fiducial': list(config.IA.values())+list(config.baryons.values()),
+                 'shift': [config.derivatives.step_size[x] for x in list(config.IA.keys())+list(config.baryons.keys())],
+                 'latex': ['$A_\mathrm{IA}$', '$\log T_\mathrm{AGN}$']}
 redshift_params = {'name': [f'dz{i+1}' for i in range(N_z_bins)],
                    'fiducial': [0.] * N_z_bins,
                    'shift': [config.derivatives.step_size.delta_z] * N_z_bins,
@@ -101,13 +101,12 @@ redshift_params = {'name': [f'dz{i+1}' for i in range(N_z_bins)],
 
 # Compute the fisher matrix
 print(f'Computing fisher matrix.')
-# TODO: Update here with astro_params
 fm = fisher_matrix(cosmo=cosmo, z=z_arr, dndz=nz_arr, ell=ell_arr,
                    sigma_e=sigma_e,
                    n_bar=config.redshift_distributions.sources.nbar,
                    fsky=config.forecast.fsky, Delta_ell=Delta_ell,
                    n_points=config.derivatives.stencil_points, cosmo_params=cosmo_params,
-                   IA_params=IA_params, redshift_params=redshift_params)
+                   astro_params=astro_params, redshift_params=redshift_params)
 
 # Add Gaussian photo-z priors
 mean_z = np.trapz(nz_arr * z_arr, z_arr)
@@ -147,6 +146,7 @@ for ip, p in enumerate(config.sampling_validation.keys()):
 # Likelihood
 def likelihood(param_dict):
     cosmo_in_dict = {}
+    bayrons_dict_in = {}
 
     for ip, p in enumerate(config.sampling_validation.keys()):
         if config.sampling_validation[p] is None:
@@ -154,16 +154,17 @@ def likelihood(param_dict):
                 cosmo_in_dict[p] = config.cosmology[p]
             elif p == 'A_IA':
                 A_IA_in = None
-            # TODO: Add the baryons here
             elif p == 'delta_z':
                 dndz_in = nz_arr
             continue
         else:
             if p in config.cosmology.keys():
                 cosmo_in_dict[p] = 1.*param_dict[p]
+            elif p == 'logT_AGN':
+                bayrons_dict_in = {'kmax': 20, "halofit_version": "mead2020_feedback",
+                                   "HMCode_logT_AGN": 1.*param_dict['logT_AGN']}
             elif p == 'A_IA':
                 A_IA_in = 1.*param_dict['A_IA']
-            # TODO: Add the baryons here
             elif p == 'delta_z':
                 dndz_in = np.zeros(nz_arr.shape)
                 for i in range(N_z_bins):
@@ -176,8 +177,8 @@ def likelihood(param_dict):
         cosmo_in_dict['Omega_c'] = cosmo_in_dict['Omega_m'] - cosmo_in_dict['Omega_b']
         cosmo_in_dict.pop('Omega_m')
     try:
-        # TODO: Add the baryons here
-        cosmo_in = ccl.Cosmology(**cosmo_in_dict, extra_parameters={"camb": {"dark_energy_model": "ppf"}})
+        bayrons_dict_in.update({"dark_energy_model": "ppf"})
+        cosmo_in = ccl.Cosmology(**cosmo_in_dict, extra_parameters={"camb": bayrons_dict_in})
         model = fisher.get_Cell_data_vector(cosmo_in, z_arr, dndz_in, A_IA_in, ell_arr)
         model = np.array(list(model.values())).flatten()
         #return multivariate_normal.logpdf(model, mean=data, cov=cov)
