@@ -310,7 +310,7 @@ class fisher_matrix(object):
         assert all(s in self.cosmo_params for s in ['name', 'fiducial']) and \
                all(s in self.astro_params for s in ['name', 'fiducial']) and \
                all(s in self.redshift_params for s in ['name', 'fiducial'])
-        A_IA = np.array(self.astro_params['fiducial'])[np.in1d(self.astro_params['name'], 'A_IA')][0]
+        self.A_IA = np.array(self.astro_params['fiducial'])[np.in1d(self.astro_params['name'], 'A_IA')][0]
         for param_dict in [self.cosmo_params, self.astro_params, self.redshift_params]:
             if 'latex' not in param_dict:
                 param_dict['latex'] = param_dict['name']
@@ -318,7 +318,7 @@ class fisher_matrix(object):
                 param_dict['shift'] = [-1.]*len(param_dict['name'])
 
         if fisher_from_input is None:
-            self.C_ell = get_Cell_data_vector(self.cosmo, self.z, self.dndz, A_IA, self.ell)
+            self.C_ell = get_Cell_data_vector(self.cosmo, self.z, self.dndz, self.A_IA, self.ell)
             self.data_covariance = get_covariance(self.ell, self.C_ell,
                                                   self.n_bar, self.sigma_e,
                                                   f_sky=self.fsky, Delta_ell=self.Delta_ell)

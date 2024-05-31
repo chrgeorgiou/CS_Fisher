@@ -1,4 +1,4 @@
-name: example
+name: IA
 
 paths:
     # Add below the directory of the project.
@@ -18,25 +18,25 @@ cosmology:
     wa: 0
 
 baryons:
-    logT_AGN: 7.6
+    logT_AGN:
 
 IA:
-    A_IA: 1.0
+    A_IA: 0.1
 
 derivatives:
     validation: [w0, wa]
-    stencil_points: 3
+    stencil_points: 5
     step_size:
         Omega_m: 0.01
         Omega_b:
         h:
         sigma8: 0.01
         n_s:
-        w0: 0.02
+        w0: 0.01
         wa:
-        logT_AGN: 0.01
+        logT_AGN:
         A_IA: 0.01
-        delta_z: 0.02
+        delta_z:
 
 ell_binning:
     cosmic_shear:
@@ -44,7 +44,7 @@ ell_binning:
         bin_end: 15001
         N_bins: 20
         ell_min: 100
-        ell_max: 3000
+        ell_max: 2000
 
 forecast:
     fsky: 0.4
@@ -62,6 +62,6 @@ sampling_validation:
     n_s:
     w0: [-1.5, 1.5]
     wa:
-    logT_AGN: [6.4, 8.0]
-    A_IA: [-5, 5]
+    logT_AGN:
+    A_IA:
     delta_z:
