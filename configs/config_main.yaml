@@ -19,6 +19,9 @@ cosmology:
     w0: -1
     wa: 0
 
+baryons:
+    logT_AGN: 7.8
+
 IA:
     A_IA: 1.0
 
@@ -28,8 +31,9 @@ step_size:
     h:
     sigma8: 0.05
     n_s:
-    w0: 0.07
-    wa: 0.3
+    w0: 0.01
+    wa: 0.01
+    logT_AGN: 0.01
     A_IA: 0.01
     delta_z: 0.02
 
