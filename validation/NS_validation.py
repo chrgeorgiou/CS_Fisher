@@ -140,23 +140,20 @@ for ip, p in enumerate(config.sampling_validation.keys()):
             prior.add_parameter(f'dz_{i + 1}', dist=norm(loc=0.0,
                 scale=config.redshift_distributions.sources.sigma_delta_z*(1 + mean_z[i])))
     else:
-        raise ValueError(f'Input parameter in config file had problem: {p}')
+        raise ValueError(f'Input sampling parameter in config file had problem: {p}.')
 
 
 # Likelihood
 def likelihood(param_dict):
     cosmo_in_dict = {}
     bayrons_dict_in = {}
+    A_IA_in = None
+    dndz_in = nz_arr
 
     for ip, p in enumerate(config.sampling_validation.keys()):
         if config.sampling_validation[p] is None:
             if p in config.cosmology.keys():
                 cosmo_in_dict[p] = config.cosmology[p]
-            elif p == 'A_IA':
-                A_IA_in = None
-            elif p == 'delta_z':
-                dndz_in = nz_arr
-            continue
         else:
             if p in config.cosmology.keys():
                 cosmo_in_dict[p] = 1.*param_dict[p]
@@ -170,6 +167,8 @@ def likelihood(param_dict):
                 for i in range(N_z_bins):
                     interp_dndz = interp1d(z_arr, nz_arr[i], bounds_error=False, fill_value=0)
                     dndz_in[i] = interp_dndz(z_arr + 1.*param_dict[f'dz_{i+1}'])
+            else:
+                raise ValueError(f'Input sampling parameter in config file had problem: {p}.')
 
     if cosmo_in_dict['w0']+cosmo_in_dict['wa'] > 0:
         return -np.inf
