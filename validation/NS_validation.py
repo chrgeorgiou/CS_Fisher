@@ -178,7 +178,7 @@ def likelihood(param_dict):
     try:
         bayrons_dict_in.update({"dark_energy_model": "ppf"})
         cosmo_in = ccl.Cosmology(**cosmo_in_dict, extra_parameters={"camb": bayrons_dict_in})
-        model = fisher.get_Cell_data_vector(cosmo_in, z_arr, dndz_in, A_IA_in, ell_arr)
+        model = fisher.get_Cell_data_vector(cosmo_in, z_arr, dndz_in, A_IA_in, ell=ell_arr)
         model = np.array(list(model.values())).flatten()
         #return multivariate_normal.logpdf(model, mean=data, cov=cov)
         return -0.5 * np.dot(np.dot(data-model, invcov), data-model)

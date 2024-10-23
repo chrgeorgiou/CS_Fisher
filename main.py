@@ -1,19 +1,18 @@
 import pyccl as ccl
 import numpy as np
 from itertools import pairwise
-from src import load_config, fisher_matrix, redshift_distributions, IO
+from src import load_config, fisher_matrix, redshift_distributions, IO, names_to_latex
 
 
 def main(config):
     print(f'Running fisher analysis for {config.name}.')
+
     # Load the cosmology
-    cosmo = ccl.Cosmology(Omega_c=config.cosmology.Omega_m-config.cosmology.Omega_b,
-                          Omega_b=config.cosmology.Omega_b,
-                          h=config.cosmology.h,
-                          sigma8=config.cosmology.sigma8,
-                          n_s=config.cosmology.n_s,
-                          w0=config.cosmology.w0,
-                          wa=config.cosmology.wa,
+    ccl_cosmo_params = dict(zip(config.cosmology.keys(), config.cosmology.values()))
+    if 'Omega_m' in ccl_cosmo_params.keys():
+        ccl_cosmo_params['Omega_c'] = ccl_cosmo_params['Omega_m'] - ccl_cosmo_params['Omega_b']
+        ccl_cosmo_params.pop('Omega_m')
+    cosmo = ccl.Cosmology(**ccl_cosmo_params,
                           matter_power_spectrum='camb',
                           extra_parameters = {"camb": config.baryons_dict})
 
@@ -44,12 +43,11 @@ def main(config):
     cosmo_params = {'name': list(config.cosmology.keys()),
                     'fiducial': list(config.cosmology.values()),
                     'shift': [config.derivatives.step_size[x] for x in list(config.cosmology.keys())],
-                    'latex': ['$\Omega_\mathrm{m}$', '$\Omega_\mathrm{b}$', '$h$',
-                              '$\sigma_8$', '$n_\mathrm{s}$', r'$w_0$', r'$w_a$']}
+                    'latex': [names_to_latex(x) for x in config.cosmology.keys()]}
     astro_params = {'name': list(config.IA.keys())+list(config.baryons.keys()),
-                 'fiducial': list(config.IA.values())+list(config.baryons.values()),
-                 'shift': [config.derivatives.step_size[x] for x in list(config.IA.keys())+list(config.baryons.keys())],
-                 'latex': ['$A_\mathrm{IA}$', '$\log T_\mathrm{AGN}$']}
+                    'fiducial': list(config.IA.values())+list(config.baryons.values()),
+                    'shift': [config.derivatives.step_size[x] for x in list(config.IA.keys())+list(config.baryons.keys())],
+                    'latex': [names_to_latex(x) for x in list(config.IA.keys())+list(config.baryons.keys())]}
     redshift_params = {'name': [f'dz{i+1}' for i in range(N_z_bins)],
                        'fiducial': [0.] * N_z_bins,
                        'shift': [config.derivatives.step_size.delta_z] * N_z_bins,
@@ -68,6 +66,9 @@ def main(config):
     scale_z = config.redshift_distributions.sources.sigma_delta_z*(1+mean_z)
     fm.add_prior(redshift_params['name'], scale_z)
 
+    print(f'Writing output.')
+    IO.save_fisher_matrix(config, fm, 'fisher_matrix')
+
     # Fisher matrix validation
     print(f'Producing fisher matrix validation plot.')
     shifts = np.geomspace(5e-3, 3e-1, 16)
@@ -75,7 +76,6 @@ def main(config):
     FoM_validation = fm.validate_fisher_matrix(shifts, FoM_parameters)
 
     print(f'Writing output.')
-    IO.save_fisher_matrix(config, fm, 'fisher_matrix')
     IO.save_fisher_matrix_validation(config, shifts, FoM_validation, 'validation_fisher_matrix')
 
 
@@ -90,5 +90,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     config = load_config(args.config)
+    config = load_config('configs/config_main.yaml')
 
     main(config)

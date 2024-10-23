@@ -18,7 +18,7 @@ cosmology:
     wa: 0
 
 baryons:
-    logT_AGN: 7.6
+    logT_AGN: 7
 
 IA:
     A_IA:

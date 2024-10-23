@@ -21,7 +21,7 @@ baryons:
     logT_AGN:
 
 IA:
-    A_IA: 0.1
+    A_IA: 0.05
 
 derivatives:
     validation: [Omega_m, sigma8]

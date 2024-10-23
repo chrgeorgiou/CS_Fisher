@@ -4,6 +4,7 @@ from src import fisher_matrix
 from src.configs import DictAsMember
 
 
+# TODO: I should change this all...
 def save_fisher_matrix(config: DictAsMember, fisher: fisher_matrix, name: 'str'):
     output_dir = config.paths.output.fisher_matrix
     if not os.path.exists(output_dir):
@@ -36,11 +37,11 @@ def load_fisher_matrix(config: DictAsMember,
                     'fiducial': list(config.cosmology.values()),
                     'shift': [config.derivatives.step_size[x] for x in list(config.cosmology.keys())],
                     'latex': ['$\Omega_\mathrm{m}$', '$\Omega_\mathrm{b}$', '$h$',
-                              '$\sigma_8$', '$n_\mathrm{s}$', r'$w_0$', r'$w_a$']}
+                              '$\sigma_8$', '$n_\mathrm{s}$', r'$w_0$', r'$w_a$', '']}
     astro_params = {'name': list(config.IA.keys()) + list(config.baryons.keys()),
                     'fiducial': list(config.IA.values()) + list(config.baryons.values()),
                     'shift': [config.derivatives.step_size[x] for x in list(config.IA.keys()) + list(config.baryons.keys())],
-                    'latex': ['$A_\mathrm{IA}$', '$\log T_\mathrm{AGN}$']}
+                    'latex': ['$A_\mathrm{IA}$', '$\eta$', '$\log T_\mathrm{AGN}$']}
     redshift_params = {'name': [f'dz{i+1}' for i in range(N_z_bins)],
                        'fiducial': [0.] * N_z_bins,
                        'shift': [config.derivatives.step_size.delta_z] * N_z_bins,

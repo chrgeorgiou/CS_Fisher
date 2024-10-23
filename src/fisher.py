@@ -8,7 +8,8 @@ import warnings
 
 def get_Cell_data_vector(cosmo: ccl.Cosmology,
                          z: np.ndarray, dndz: np.ndarray,
-                         A_IA: float, ell: np.ndarray)\
+                         A_IA: float, eta: float = None,
+                         ell: np.ndarray = None)\
         -> dict:
     """
     Computes the cosmic shear C_ell's. Assumes constant A_IA.
@@ -20,6 +21,8 @@ def get_Cell_data_vector(cosmo: ccl.Cosmology,
             If 1-D, one redshift bin is assumed. Otherwise, the dimensions should be
             (n_z_bins, n_z_values).
         A_IA (float): Value of the intrinsic alignment amplitude.
+        eta (float): Value of the redshift power-law index (A~A_IA*(1+z)**eta).
+            Default is without scaling at all.
         ell (array): Values of multipoles where the C_ell's will be computed.
 
     Returns:
@@ -31,7 +34,11 @@ def get_Cell_data_vector(cosmo: ccl.Cosmology,
     if A_IA is None:
         ia_bias = None
     else:
-        ia_bias = (z, A_IA*np.ones_like(z))
+        if eta is None:
+            ia_bias = (z, A_IA*np.ones_like(z))
+        else:
+            z0 = 0.62 # FIXME: should this be changeable?
+            ia_bias = (z, A_IA * ((1+z)/(1+z0))**eta)
 
     c_ells = {}
     for z1 in range(n_z_bins):
@@ -222,6 +229,7 @@ def compute_d_Cells(n_points: int,
 
             # Define the IA input parameters
             A_IA_in = param_in[np.in1d(params_name, 'A_IA')][0]
+            eta_in = param_in[np.in1d(params_name, 'eta')][0]
 
             # Define the baryon feedback parameters
             try:
@@ -245,7 +253,7 @@ def compute_d_Cells(n_points: int,
             cosmo_in = ccl.Cosmology(**cosmo_in_dict,
                                      matter_power_spectrum='camb',
                                      extra_parameters={"camb": {"dark_energy_model": "ppf"} | baryons_dict})
-            C_ells = get_Cell_data_vector(cosmo_in, z, dndz_in, A_IA_in, ell)
+            C_ells = get_Cell_data_vector(cosmo_in, z, dndz_in, A_IA_in, eta_in, ell)
             d_Cells[:, di, :] += coeff[n] * np.array(list(C_ells.values())).T / params_shift[pi]
         di += 1
     return d_Cells
@@ -310,7 +318,9 @@ class fisher_matrix(object):
         assert all(s in self.cosmo_params for s in ['name', 'fiducial']) and \
                all(s in self.astro_params for s in ['name', 'fiducial']) and \
                all(s in self.redshift_params for s in ['name', 'fiducial'])
+
         self.A_IA = np.array(self.astro_params['fiducial'])[np.in1d(self.astro_params['name'], 'A_IA')][0]
+        self.eta = np.array(self.astro_params['fiducial'])[np.in1d(self.astro_params['name'], 'eta')][0]
         for param_dict in [self.cosmo_params, self.astro_params, self.redshift_params]:
             if 'latex' not in param_dict:
                 param_dict['latex'] = param_dict['name']
@@ -318,7 +328,7 @@ class fisher_matrix(object):
                 param_dict['shift'] = [-1.]*len(param_dict['name'])
 
         if fisher_from_input is None:
-            self.C_ell = get_Cell_data_vector(self.cosmo, self.z, self.dndz, self.A_IA, self.ell)
+            self.C_ell = get_Cell_data_vector(self.cosmo, self.z, self.dndz, self.A_IA, self.eta, self.ell)
             self.data_covariance = get_covariance(self.ell, self.C_ell,
                                                   self.n_bar, self.sigma_e,
                                                   f_sky=self.fsky, Delta_ell=self.Delta_ell)
