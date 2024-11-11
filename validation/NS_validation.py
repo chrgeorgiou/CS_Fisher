@@ -142,16 +142,13 @@ for ip, p in enumerate(config.sampling_validation.keys()):
 
 # Likelihood
 def likelihood(param_dict):
-    cosmo_in_dict = {}
+    cosmo_in_dict = config.cosmology
     bayrons_dict_in = {}
     A_IA_in = None
     dndz_in = nz_arr
 
     for ip, p in enumerate(config.sampling_validation.keys()):
-        if config.sampling_validation[p] is None:
-            if p in config.cosmology.keys():
-                cosmo_in_dict[p] = config.cosmology[p]
-        else:
+        if config.sampling_validation[p] is not None:
             if p in config.cosmology.keys():
                 cosmo_in_dict[p] = 1.*param_dict[p]
             elif p == 'logT_AGN':
@@ -159,6 +156,7 @@ def likelihood(param_dict):
                                    "HMCode_logT_AGN": 1.*param_dict['logT_AGN']}
             elif p == 'A_IA':
                 A_IA_in = 1.*param_dict['A_IA']
+            # TODO: Develop the eta parameter here.
             elif p == 'delta_z':
                 dndz_in = np.zeros(nz_arr.shape)
                 for i in range(N_z_bins):
