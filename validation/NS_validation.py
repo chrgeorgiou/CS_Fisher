@@ -12,7 +12,7 @@ from itertools import pairwise
 import argparse
 import sys
 sys.path.append('../')
-from src import load_config, fisher_matrix, redshift_distributions, IO, fisher
+from src import load_config, fisher_matrix, redshift_distributions, IO, fisher, names_to_latex
 import numpy as np
 
 
@@ -51,13 +51,11 @@ else:
 config = load_config(args.config)
 print(f'Running fisher analysis for {config.name}.')
 # Load the cosmology
-cosmo = ccl.Cosmology(Omega_c=config.cosmology.Omega_m-config.cosmology.Omega_b,
-                      Omega_b=config.cosmology.Omega_b,
-                      h=config.cosmology.h,
-                      sigma8=config.cosmology.sigma8,
-                      n_s=config.cosmology.n_s,
-                      w0=config.cosmology.w0,
-                      wa=config.cosmology.wa,
+ccl_cosmo_params = dict(zip(config.cosmology.keys(), config.cosmology.values()))
+if 'Omega_m' in ccl_cosmo_params.keys():
+    ccl_cosmo_params['Omega_c'] = ccl_cosmo_params['Omega_m'] - ccl_cosmo_params['Omega_b']
+    ccl_cosmo_params.pop('Omega_m')
+cosmo = ccl.Cosmology(**ccl_cosmo_params,
                       matter_power_spectrum='camb',
                       extra_parameters={"camb": config.baryons_dict})
 
@@ -88,12 +86,11 @@ nz_arr, zbin_edges = (
 cosmo_params = {'name': list(config.cosmology.keys()),
                 'fiducial': list(config.cosmology.values()),
                 'shift': [config.derivatives.step_size[x] for x in list(config.cosmology.keys())],
-                'latex': ['$\Omega_\mathrm{m}$', '$\Omega_\mathrm{b}$', '$h$',
-                          '$\sigma_8$', '$n_\mathrm{s}$', r'$w_0$', r'$w_a$']}
+                'latex': [names_to_latex(x) for x in config.cosmology.keys()]}
 astro_params = {'name': list(config.IA.keys())+list(config.baryons.keys()),
                  'fiducial': list(config.IA.values())+list(config.baryons.values()),
                  'shift': [config.derivatives.step_size[x] for x in list(config.IA.keys())+list(config.baryons.keys())],
-                 'latex': ['$A_\mathrm{IA}$', '$\log T_\mathrm{AGN}$']}
+                 'latex': [names_to_latex(x) for x in list(config.IA.keys())+list(config.baryons.keys())]}
 redshift_params = {'name': [f'dz{i+1}' for i in range(N_z_bins)],
                    'fiducial': [0.] * N_z_bins,
                    'shift': [config.derivatives.step_size.delta_z] * N_z_bins,

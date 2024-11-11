@@ -216,7 +216,10 @@ def compute_d_Cells(n_points: int,
     for pi, p in enumerate(params_fiducial):
         if params_shift[pi] is None: continue
         # TODO: verbose is currently not accessible.
-        if verbose: print('Computing derivatives for parameter %i' % pi)
+        if verbose: print(f'Computing derivatives for parameter '
+                          f'{params_name[pi]} with fiducial value '
+                          f'{params_fiducial[pi]} and derivative shift '
+                          f'{params_shift[pi]}.')
         for n in range(n_points-1):
             param_in = params_fiducial.copy()
             param_in[pi] += step_coeff[n] * params_shift[pi]
