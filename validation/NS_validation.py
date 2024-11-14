@@ -33,20 +33,23 @@ def parse_args():
     return parser.parse_args()
 
 
-# Manage the MPI processes so that they receive the configuration.
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
-if rank == 0:
-    # If main process, read argument parser and send it to all other processes.
-    # Note: broadcasting seems to mess up the printing and maybe more.
+try:
+    # Manage the MPI processes so that they receive the configuration.
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    if rank == 0:
+        # If main process, read argument parser and send it to all other processes.
+        # Note: broadcasting seems to mess up the printing and maybe more.
+        args = parse_args()
+        for i in range(1, size):
+            comm.send(args, dest=i, tag=99)
+    #    comm.bcast(args, root=0, )
+    else:
+        # Receive argument parser from main process.
+        args = comm.recv(source=0, tag=99)
+except:
     args = parse_args()
-    for i in range(1, size):
-        comm.send(args, dest=i, tag=99)
-#    comm.bcast(args, root=0, )
-else:
-    # Receive argument parser from main process.
-    args = comm.recv(source=0, tag=99)
 
 config = load_config(args.config)
 print(f'Running fisher analysis for {config.name}.')
@@ -57,7 +60,7 @@ if 'Omega_m' in ccl_cosmo_params.keys():
     ccl_cosmo_params.pop('Omega_m')
 cosmo = ccl.Cosmology(**ccl_cosmo_params,
                       matter_power_spectrum='camb',
-                      extra_parameters={"camb": config.baryons_dict})
+                      extra_parameters={"camb": {'dark_energy_model': 'ppf'} | config.baryons_dict})
 
 # ell binning setup
 ell_bins = np.geomspace(config.ell_binning.cosmic_shear.bin_start,
@@ -142,13 +145,16 @@ for ip, p in enumerate(config.sampling_validation.keys()):
 
 # Likelihood
 def likelihood(param_dict):
-    cosmo_in_dict = config.cosmology
-    bayrons_dict_in = {}
-    A_IA_in = None
+    cosmo_in_dict = config.cosmology.copy()
+    bayrons_dict_in = config.baryons_dict.copy()
+    A_IA_in = fm.A_IA
+    eta_in = fm.eta
     dndz_in = nz_arr
 
     for ip, p in enumerate(config.sampling_validation.keys()):
-        if config.sampling_validation[p] is not None:
+        if config.sampling_validation[p] is None:
+            continue
+        elif config.sampling_validation[p] is not None:
             if p in config.cosmology.keys():
                 cosmo_in_dict[p] = 1.*param_dict[p]
             elif p == 'logT_AGN':
@@ -156,7 +162,8 @@ def likelihood(param_dict):
                                    "HMCode_logT_AGN": 1.*param_dict['logT_AGN']}
             elif p == 'A_IA':
                 A_IA_in = 1.*param_dict['A_IA']
-            # TODO: Develop the eta parameter here.
+            elif p == 'eta':
+                eta_in = 1.*param_dict['eta']
             elif p == 'delta_z':
                 dndz_in = np.zeros(nz_arr.shape)
                 for i in range(N_z_bins):
@@ -172,8 +179,10 @@ def likelihood(param_dict):
         cosmo_in_dict.pop('Omega_m')
     try:
         bayrons_dict_in.update({"dark_energy_model": "ppf"})
-        cosmo_in = ccl.Cosmology(**cosmo_in_dict, extra_parameters={"camb": bayrons_dict_in})
-        model = fisher.get_Cell_data_vector(cosmo_in, z_arr, dndz_in, A_IA_in, ell=ell_arr)
+        cosmo_in = ccl.Cosmology(**cosmo_in_dict,
+                                 matter_power_spectrum='camb',
+                                 extra_parameters={"camb": bayrons_dict_in})
+        model = fisher.get_Cell_data_vector(cosmo_in, z_arr, dndz_in, A_IA_in, eta=eta_in, ell=ell_arr)
         model = np.array(list(model.values())).flatten()
         #return multivariate_normal.logpdf(model, mean=data, cov=cov)
         return -0.5 * np.dot(np.dot(data-model, invcov), data-model)

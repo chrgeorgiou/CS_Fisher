@@ -35,13 +35,6 @@ def load_config(config_file):
     if 'sigma8' in config['cosmology'].keys() and 'A_s' in config['cosmology'].keys():
         raise ValueError('Cannot pass both sigma8 and A_s. '
                                                   'Set one to None.')
-    '''if 'sigma8' not in config['cosmology'].keys():
-        config['cosmology']['sigma8'] = None
-    if 'A_s' not in config['cosmology'].keys():
-        config['cosmology']['A_s'] = None
-    assert (config['cosmology']['sigma8'] is None or
-            config['cosmology']['A_s'] is None), ('Cannot pass both sigma8 and A_s. '
-                                                  'Set one to None.')'''
 
     # Check for IA and baryons in the config file.
     if 'IA' not in config.keys():
