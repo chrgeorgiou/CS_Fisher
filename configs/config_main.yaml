@@ -8,8 +8,6 @@ paths:
         fisher_matrix: !join [*projectpath, output]
         figures: !join [*projectpath, figures]
 
-validation: [w0, wa]
-
 cosmology:
     Omega_m: 0.315
     Omega_b: 0.049
@@ -20,22 +18,26 @@ cosmology:
     wa: 0
 
 baryons:
-    logT_AGN: 7.8
+    logT_AGN: 7.6
 
 IA:
     A_IA: 1.0
+    eta:
 
-step_size:
-    Omega_m: 0.01
-    Omega_b:
-    h:
-    sigma8: 0.05
-    n_s:
-    w0: 0.01
-    wa: 0.01
-    logT_AGN: 0.01
-    A_IA: 0.01
-    delta_z: 0.02
+derivatives:
+    validation: [w0, wa]
+    stencil_points: 3
+    step_size:
+        Omega_m: 0.01
+        Omega_b:
+        h:
+        sigma8: 0.01
+        n_s:
+        w0: 0.02
+        wa:
+        logT_AGN: 0.01
+        A_IA: 0.01
+        delta_z: 0.02
 
 ell_binning:
     cosmic_shear:
@@ -43,12 +45,24 @@ ell_binning:
         bin_end: 15001
         N_bins: 20
         ell_min: 100
-        ell_max: 2000
+        ell_max: 3000
 
 forecast:
-    fsky: 0.43
+    fsky: 0.4
     e_rms: 0.26
-    year: 10
+    year: 1
     z_min: 0.1
     z_max: 4.
     N_z_values: 400
+
+sampling_validation:
+    Omega_m: [0.1, 0.4]
+    Omega_b:
+    h:
+    sigma8: [0.6, 1.1]
+    n_s:
+    w0: [-1.5, 1.5]
+    wa:
+    logT_AGN: [6.4, 8.0]
+    A_IA: [-5, 5]
+    delta_z:
