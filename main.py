@@ -76,6 +76,7 @@ def main(config):
     FoM_validation = fm.validate_fisher_matrix(shifts, FoM_parameters)
 
     print(f'Writing output.')
+    IO.save_fisher_matrix(config, fm, 'fisher_matrix')
     IO.save_fisher_matrix_validation(config, shifts, FoM_validation, 'validation_fisher_matrix')
 
 

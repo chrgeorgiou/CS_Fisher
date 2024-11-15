@@ -108,6 +108,8 @@ def baryons_dictionary(config):
                 return {"baryons_dict": {"kmax": 20.0, "halofit_version": "mead2020_feedback",
                                          "HMCode_logT_AGN": config['baryons']['logT_AGN']}}
 
+                return {"baryons_dict": {"kmax": 20.0, "halofit_version": "mead2020_feedback",
+                                         "HMCode_logT_AGN": config['baryons']['logT_AGN']}}
 
 def names_to_latex(parameter_name, dollar_signs=True):
     if parameter_name=='Omega_m':
