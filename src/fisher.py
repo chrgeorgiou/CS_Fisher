@@ -314,7 +314,7 @@ class fisher_matrix(object):
         if cosmo_params is None:
             self.cosmo_params = {'name': [], 'fiducial': [], 'shift': []}
         if astro_params is None:
-            self.astro_params = {'name': ['A_IA'], 'fiducial': [None], 'shift': [None]}
+            self.astro_params = {'name': ['A_IA', 'eta'], 'fiducial': [None, None], 'shift': [None, None]}
         if redshift_params is None:
             self.redshift_params = {'name': [], 'fiducial': [], 'shift': []}
 
