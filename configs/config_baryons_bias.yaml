@@ -3,7 +3,7 @@ name: baryons
 paths:
     # Add below the directory of the project.
     # Rest of the paths are relative but might need to be changed for specific cases.
-    project: &projectpath /Users/Georg022/PycharmProjects/CS_Fisher
+    project: &projectpath /home/georg022/PycharmProjects/CS_Fisher
     output:
         fisher_matrix: !join [*projectpath, output]
         figures: !join [*projectpath, figures]
@@ -22,6 +22,7 @@ baryons:
 
 IA:
     A_IA:
+    eta:
 
 derivatives:
     validation: [Omega_m, sigma8]

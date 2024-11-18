@@ -146,9 +146,10 @@ for ip, p in enumerate(config.sampling_validation.keys()):
 # Likelihood
 def likelihood(param_dict):
     cosmo_in_dict = config.cosmology.copy()
-    bayrons_dict_in = config.baryons_dict.copy()
-    A_IA_in = fm.A_IA
-    eta_in = fm.eta
+    # These three: if set from fm, cannot run bias analysis.
+    bayrons_dict_in = {} #config.baryons_dict.copy()
+    A_IA_in = None #fm.A_IA
+    eta_in = None #fm.eta
     dndz_in = nz_arr
 
     for ip, p in enumerate(config.sampling_validation.keys()):
