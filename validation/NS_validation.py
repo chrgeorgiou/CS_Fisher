@@ -133,12 +133,12 @@ prior = Prior()
 for ip, p in enumerate(config.sampling_validation.keys()):
     if config.sampling_validation[p] is None:
         continue
-    elif len(config.sampling_validation[p]) == 2:
-        prior.add_parameter(p, dist=tuple(config.sampling_validation[p]))
     elif p == 'delta_z':
         for i in range(N_z_bins):
             prior.add_parameter(f'dz_{i + 1}', dist=norm(loc=0.0,
                 scale=config.redshift_distributions.sources.sigma_delta_z*(1 + mean_z[i])))
+    elif len(config.sampling_validation[p]) == 2:
+        prior.add_parameter(p, dist=tuple(config.sampling_validation[p]))
     else:
         raise ValueError(f'Input sampling parameter in config file had problem: {p}.')
 

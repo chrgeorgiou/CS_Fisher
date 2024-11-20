@@ -60,6 +60,5 @@ sampling_validation:
     n_s: [0.8, 1.1]
     w0: [-2., 0.]
     wa: [-3, 3]
-    logT_AGN:
     A_IA: [0.5, 1.5]
     delta_z: yes
