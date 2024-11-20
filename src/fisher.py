@@ -222,6 +222,9 @@ def compute_d_Cells(n_points: int,
                           f'{params_shift[pi]}.')
         for n in range(n_points-1):
             param_in = params_fiducial.copy()
+            if params_name[pi] == 'A_s':
+                # FIXME: Need to fully test this because the derivative is too large.
+                params_shift[pi] *= 1.e-9
             param_in[pi] += step_coeff[n] * params_shift[pi]
             # Define cosmology input dictionary
             cosmo_params_in = param_in[:N_cosmo]
