@@ -155,23 +155,27 @@ def likelihood(param_dict):
     for ip, p in enumerate(config.sampling_validation.keys()):
         if config.sampling_validation[p] is None:
             continue
-        elif config.sampling_validation[p] is not None:
-            if p in config.cosmology.keys():
-                cosmo_in_dict[p] = 1.*param_dict[p]
-            elif p == 'logT_AGN':
-                bayrons_dict_in = {'kmax': 20, "halofit_version": "mead2020_feedback",
-                                   "HMCode_logT_AGN": 1.*param_dict['logT_AGN']}
-            elif p == 'A_IA':
-                A_IA_in = 1.*param_dict['A_IA']
-            elif p == 'eta':
-                eta_in = 1.*param_dict['eta']
-            elif p == 'delta_z':
-                dndz_in = np.zeros(nz_arr.shape)
-                for i in range(N_z_bins):
-                    interp_dndz = interp1d(z_arr, nz_arr[i], bounds_error=False, fill_value=0)
-                    dndz_in[i] = interp_dndz(z_arr + 1.*param_dict[f'dz_{i+1}'])
+        if p in config.cosmology.keys():
+            if p == 'A_s':
+                cosmo_in_dict[p] = 1.e-9 * param_dict[p]
             else:
-                raise ValueError(f'Input sampling parameter in config file had problem: {p}.')
+                cosmo_in_dict[p] = 1. * param_dict[p]
+        elif p == 'logA_s':
+            cosmo_in_dict['A_s'] = 10. ** param_dict[p]
+        elif p == 'logT_AGN':
+            bayrons_dict_in = {'kmax': 20, "halofit_version": "mead2020_feedback",
+                               "HMCode_logT_AGN": 1.*param_dict['logT_AGN']}
+        elif p == 'A_IA':
+            A_IA_in = 1.*param_dict['A_IA']
+        elif p == 'eta':
+            eta_in = 1.*param_dict['eta']
+        elif p == 'delta_z':
+            dndz_in = np.zeros(nz_arr.shape)
+            for i in range(N_z_bins):
+                interp_dndz = interp1d(z_arr, nz_arr[i], bounds_error=False, fill_value=0)
+                dndz_in[i] = interp_dndz(z_arr + 1.*param_dict[f'dz_{i+1}'])
+        else:
+            raise ValueError(f'Input sampling parameter in config file had problem: {p}.')
 
     if cosmo_in_dict['w0']+cosmo_in_dict['wa'] > 0:
         return -np.inf

@@ -24,9 +24,18 @@ cosmology: The values of corresponding cosmological parameters.
 
 IA:
     A_IA: The value of the NLA amplitude.
+    eta: The value of the redshift dependence ((1+z)/(1+z0))**eta with z0=0.62.
 
-step_size: Step size for calculating derivatives of each parameter. 
-           if left empty, that parameter will not be varied in the fisher matrix.
+derivatives:
+    validation: Parameters to use to compute the figure of merit when validating derivatives.
+    stencil_points: Number of points for the stencil method to compute derivatives.
+    step_size:
+        Omega_m: 0.002
+        Omega_b: 0.002
+        A_s: 0.002
+            Step size for calculating derivatives of each parameter. 
+            if left empty, that parameter will not be varied in the fisher matrix.
+            Note that, if used, the step size of A_s should be in units of 1e+9.
 
 ell_binning:
     cosmic_shear:
@@ -43,6 +52,14 @@ forecast:
     z_min: Minimum redshift for the distribution.
     z_max: Maximum redshift for the distribution.
     N_z_values: Number of redshift values.
+
+sampling_validation:
+    Omega_m: [0.2, 0.45]
+    Omega_b: [0.005, 0.12]
+    A_s: [1.0, 3.0]
+    logA_s: [-8, -6] # Don't use both! Using base-10 logarithm.
+        Ranges for the uniform priors to be used during nested sampling.
+        Note that, if used, the ranges of A_s should be in units of 1e+9
 ```
 
 # Fisher Matrix
