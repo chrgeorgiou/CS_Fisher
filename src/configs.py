@@ -40,16 +40,14 @@ def load_config(config_file):
     if 'IA' not in config.keys():
         config['IA'] = {'A_IA': None}
     if 'baryons' not in config.keys():
-        list_baryons = []
-    else:
-        list_baryons = list(config['baryons'].keys())
+        config['baryons'] = {'logT_AGN': None}
     config.update(baryons_dictionary(config))
 
     # Add redshift information from SRD (Y1 and Y10)
     config.update(redshift_distributions_for_year(config['forecast']['year']))
 
     # Correct if some parameters are missing from the derivatives list, don't vary them.
-    for key in list(config['cosmology'].keys())+list(config['IA'].keys())+list_baryons:
+    for key in list(config['cosmology'].keys())+list(config['IA'].keys())+list(config['baryons'].keys()):
         if key not in config['derivatives']['step_size']:
             config['derivatives']['step_size'][key] = None
 
@@ -108,8 +106,6 @@ def baryons_dictionary(config):
                 return {"baryons_dict": {"kmax": 20.0, "halofit_version": "mead2020_feedback",
                                          "HMCode_logT_AGN": config['baryons']['logT_AGN']}}
 
-                return {"baryons_dict": {"kmax": 20.0, "halofit_version": "mead2020_feedback",
-                                         "HMCode_logT_AGN": config['baryons']['logT_AGN']}}
 
 def names_to_latex(parameter_name, dollar_signs=True):
     if parameter_name=='Omega_m':

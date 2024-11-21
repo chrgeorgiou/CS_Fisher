@@ -222,7 +222,14 @@ def compute_d_Cells(n_points: int,
                           f'{params_shift[pi]}.')
         for n in range(n_points-1):
             param_in = params_fiducial.copy()
+            if params_name[pi] == 'A_s':
+                # This way the units should be right, but is the matrix okay?
+                params_shift[pi] *= 1.e-9
             param_in[pi] += step_coeff[n] * params_shift[pi]
+            # This way I have to correct the units but the matrix might be more stable.
+            #    param_in[pi] += step_coeff[n] * params_shift[pi] * 1.e-9
+            #else:
+            #    param_in[pi] += step_coeff[n] * params_shift[pi]
             # Define cosmology input dictionary
             cosmo_params_in = param_in[:N_cosmo]
             cosmo_in_dict = dict(zip(cosmo_params['name'], cosmo_params_in))
@@ -314,7 +321,7 @@ class fisher_matrix(object):
         if cosmo_params is None:
             self.cosmo_params = {'name': [], 'fiducial': [], 'shift': []}
         if astro_params is None:
-            self.astro_params = {'name': ['A_IA'], 'fiducial': [None], 'shift': [None]}
+            self.astro_params = {'name': ['A_IA', 'eta'], 'fiducial': [None, None], 'shift': [None, None]}
         if redshift_params is None:
             self.redshift_params = {'name': [], 'fiducial': [], 'shift': []}
 
@@ -423,6 +430,10 @@ class fisher_matrix(object):
             self.fisher_matrix[param_id, param_id] += 1./sigma_parameters_[i]**2
         self.covariance = np.linalg.inv(self.fisher_matrix)
         self.priors = [parameters_, sigma_parameters_]
+
+    def parameter_transformation(self, jacobian: np.ndarray,
+                                 param_in: dict, param_out: dict):
+        self.fisher_matrix = np.dot(np.dot(jacobian.T, self.fisher_matrix), jacobian)
 
     def marginalised_covariance(self, parameters: iter) -> np.ndarray:
         """
