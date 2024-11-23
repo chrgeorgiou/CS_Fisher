@@ -35,6 +35,8 @@ def names_to_latex(parameter_name, dollar_signs=True):
         latex_name = '10^{9}A_s'
     elif parameter_name == 'logA_s':
         latex_name = r'\log_{10}\left(A_s\right)'
+    elif parameter_name == 'S8':
+        latex_name = 'S_8'
 
     else:
         raise ValueError(f'Not recognised parameter {parameter_name} and cannot return its latex string.')
