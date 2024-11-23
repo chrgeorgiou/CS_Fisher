@@ -47,7 +47,8 @@ def load_config(config_file):
     config.update(redshift_distributions_for_year(config['forecast']['year']))
 
     # Correct if some parameters are missing from the derivatives list, don't vary them.
-    for key in list(config['cosmology'].keys())+list(config['IA'].keys())+list(config['baryons'].keys()):
+    for key in (list(config['cosmology'].keys())+list(config['IA'].keys())+
+                list(config['baryons'].keys())+['delta_z']):
         if key not in config['derivatives']['step_size']:
             config['derivatives']['step_size'][key] = None
 
@@ -105,41 +106,3 @@ def baryons_dictionary(config):
             else:
                 return {"baryons_dict": {"kmax": 20.0, "halofit_version": "mead2020_feedback",
                                          "HMCode_logT_AGN": config['baryons']['logT_AGN']}}
-
-
-def names_to_latex(parameter_name, dollar_signs=True):
-    if parameter_name=='Omega_m':
-        latex_name = '\Omega_\mathrm{m}'
-    elif parameter_name=='Omega_b':
-        latex_name = '\Omega_\mathrm{b}'
-    elif parameter_name == 'h':
-        latex_name = 'h'
-    elif parameter_name == 'n_s':
-        latex_name = 'n_\mathrm{s}'
-    elif parameter_name == 'sigma8':
-        latex_name = '\sigma_8'
-    elif parameter_name == 'A_s':
-        latex_name = 'A_\mathrm{s}'
-    elif parameter_name == 'w0':
-        latex_name = 'w_0'
-    elif parameter_name == 'wa':
-        latex_name = 'w_a'
-
-    elif parameter_name == 'A_IA':
-        latex_name = 'A_\mathrm{IA}'
-    elif parameter_name == 'eta':
-        latex_name = '\eta'
-    elif parameter_name == 'logT_AGN':
-        latex_name = '\log T_\mathrm{AGN}'
-
-    elif parameter_name.startswith('dz'):
-        z_bin = parameter_name.split('dz')[1]
-        latex_name = f'\Delta z_{z_bin}'
-
-    else:
-        raise ValueError(f'Not recognised parameter {parameter_name} and cannot return its latex string.')
-
-    if dollar_signs:
-        return f'${latex_name}$'
-    else:
-        return latex_name

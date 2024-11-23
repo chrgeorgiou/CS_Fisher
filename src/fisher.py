@@ -4,6 +4,7 @@ from scipy.interpolate import interp1d
 from matplotlib.patches import Ellipse
 from scipy.stats import chi2
 import warnings
+from .utils import sigma8_derivative, names_to_latex
 
 
 def get_Cell_data_vector(cosmo: ccl.Cosmology,
@@ -220,16 +221,11 @@ def compute_d_Cells(n_points: int,
                           f'{params_name[pi]} with fiducial value '
                           f'{params_fiducial[pi]} and derivative shift '
                           f'{params_shift[pi]}.')
+        if params_name[pi] == 'A_s':
+            params_shift[pi] *= 1.e-9
         for n in range(n_points-1):
             param_in = params_fiducial.copy()
-            if params_name[pi] == 'A_s':
-                # This way the units should be right, but is the matrix okay?
-                params_shift[pi] *= 1.e-9
             param_in[pi] += step_coeff[n] * params_shift[pi]
-            # This way I have to correct the units but the matrix might be more stable.
-            #    param_in[pi] += step_coeff[n] * params_shift[pi] * 1.e-9
-            #else:
-            #    param_in[pi] += step_coeff[n] * params_shift[pi]
             # Define cosmology input dictionary
             cosmo_params_in = param_in[:N_cosmo]
             cosmo_in_dict = dict(zip(cosmo_params['name'], cosmo_params_in))
@@ -370,6 +366,7 @@ class fisher_matrix(object):
                                                 self.redshift_params['latex'])
                                                )[ids_varied]
         self.covariance = np.linalg.inv(self.fisher_matrix)
+        self.dim = len(self.parameters)
 
     def __getitem__(self, *keys):
         """ Determines behavior of `self[key]` """
@@ -431,10 +428,6 @@ class fisher_matrix(object):
         self.covariance = np.linalg.inv(self.fisher_matrix)
         self.priors = [parameters_, sigma_parameters_]
 
-    def parameter_transformation(self, jacobian: np.ndarray,
-                                 param_in: dict, param_out: dict):
-        self.fisher_matrix = np.dot(np.dot(jacobian.T, self.fisher_matrix), jacobian)
-
     def marginalised_covariance(self, parameters: iter) -> np.ndarray:
         """
         Returns the marginalised covariance of the Fisher matrix.
@@ -445,6 +438,57 @@ class fisher_matrix(object):
         """
         param_indices = np.arange(len(self.parameters))[np.in1d(self.parameters, parameters)]
         return self.covariance[np.ix_(param_indices, param_indices)]
+
+    def transform_fisher_matrix(self, jacobian, param_old, param_new, param_new_value):
+        ret = self.copy()
+        ret.fisher_matrix = np.dot(np.dot(jacobian.T, self.fisher_matrix), jacobian)
+        ret.covariance = np.linalg.inv(ret.fisher_matrix)
+
+        param_idx = np.arange(self.dim)[np.in1d(self.parameters, param_old)]
+        ret.parameters[param_idx] = param_new
+        ret.fiducial_parameters[param_idx] = param_new_value
+        ret.latex_parameters[param_idx] = names_to_latex(param_new)
+
+        # FIXME: Is there a better way to do this and keep these quantities?
+        ret.d_C_ell = None
+        ret.cosmo_params = None
+        ret.astro_params = None
+        ret.redshift_params = None
+
+        return ret
+
+    def transform_A_s_to_sigma8(self):
+        cosmo_dict = dict(zip(self.cosmo_params['name'], self.cosmo_params['fiducial']))
+        cosmo_params_for_derivative = np.intersect1d(self.cosmo_params['name'], self.parameters)
+        dsig8_arr = np.array([sigma8_derivative(cosmo_dict, i, 0.01, 3) for i in cosmo_params_for_derivative])
+        dsig8 = dict(zip(cosmo_params_for_derivative, dsig8_arr))
+
+        # we computed partial derivatives d sig8/d cosmo_params but we need d cosmo_params/d sig8.
+        # For that, we need the inverse Jacobian.
+        A_s_idx = np.arange(self.dim)[np.in1d(self.parameters, 'A_s')]
+        M = np.identity(self.dim)
+        for ip, p in enumerate(self.parameters):
+            if p in self.cosmo_params['name']:
+                M[ip, A_s_idx] = dsig8[p]
+        M = np.linalg.inv(M)
+
+        return self.transform_fisher_matrix(M, 'A_s', 'sigma8', self.cosmo.sigma8())
+
+    def transform_A_s_to_m9A_s(self):
+        M = np.identity(self.dim)
+        A_s_idx = np.arange(self.dim)[np.in1d(self.parameters, 'A_s')]
+        M[A_s_idx, A_s_idx] = 1.e-9
+
+        return self.transform_fisher_matrix(M, 'A_s', 'A_s_9',
+                                            1.e9*self.fiducial_parameters[A_s_idx])
+
+    def transform_A_s_to_logA_s(self):
+        M = np.identity(self.dim)
+        A_s_idx = np.arange(self.dim)[np.in1d(self.parameters, 'A_s')]
+        M[A_s_idx, A_s_idx] = np.log(10) * self.fiducial_parameters[A_s_idx]
+
+        return self.transform_fisher_matrix(M, 'A_s', 'logA_s',
+                                            np.log10(self.fiducial_parameters[A_s_idx][0]))
 
     def figure_of_merit(self, parameters: iter) -> float:
         """

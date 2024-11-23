@@ -1,7 +1,7 @@
 import os
 import numpy as np
-from src import fisher_matrix
-from src.configs import DictAsMember, names_to_latex
+from src import fisher_matrix, names_to_latex
+from src.configs import DictAsMember
 
 
 # TODO: I should change this all...
