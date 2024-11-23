@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import pyccl as ccl
 from src import fisher_matrix, names_to_latex
 from src.configs import DictAsMember
 
@@ -30,6 +31,14 @@ def load_fisher_matrix(config: DictAsMember,
                        name: str) -> fisher_matrix:
     fisher_matrix_array = np.load(os.path.join(config.paths.output.fisher_matrix,
                                                f'{config.name}_{name}.npy'))
+    # Load the cosmology
+    ccl_cosmo_params = dict(zip(config.cosmology.keys(), config.cosmology.values()))
+    if 'Omega_m' in ccl_cosmo_params.keys():
+        ccl_cosmo_params['Omega_c'] = ccl_cosmo_params['Omega_m'] - ccl_cosmo_params['Omega_b']
+        ccl_cosmo_params.pop('Omega_m')
+    cosmo = ccl.Cosmology(**ccl_cosmo_params,
+                          matter_power_spectrum='camb',
+                          extra_parameters={"camb": config.baryons_dict})
 
     N_z_bins = config.redshift_distributions.sources.N_z_bins
 
@@ -46,7 +55,8 @@ def load_fisher_matrix(config: DictAsMember,
                        'shift': [config.derivatives.step_size.delta_z] * N_z_bins,
                        'latex': ['$\Delta z_{%i}$' % (i + 1) for i in range(N_z_bins)]}
 
-    fisher_matrix_object = fisher_matrix(fisher_from_input=fisher_matrix_array,
+    fisher_matrix_object = fisher_matrix(cosmo=cosmo,
+                                         fisher_from_input=fisher_matrix_array,
                                          cosmo_params=cosmo_params,
                                          astro_params=astro_params,
                                          redshift_params=redshift_params)
