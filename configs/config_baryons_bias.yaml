@@ -12,7 +12,8 @@ cosmology:
     Omega_m: 0.315
     Omega_b: 0.049
     h: 0.674
-    sigma8: 0.811
+    #sigma8: 0.811
+    A_s: 2.0989e-9
     n_s: 0.965
     w0: -1
     wa: 0
@@ -25,10 +26,10 @@ IA:
     eta:
 
 derivatives:
-    validation: [Omega_m, sigma8]
+    validation: [Omega_m, A_s]
     stencil_points: 5
     step_size:
-        Omega_m: 0.01
+        Omega_m: 0.003
         Omega_b:
         h:
         sigma8: 0.01
@@ -56,12 +57,12 @@ forecast:
     N_z_values: 400
 
 sampling_validation:
-    Omega_m: [0.1, 0.4]
+    Omega_m: [0.1, 0.9]
     Omega_b:
     h:
-    sigma8: [0.6, 1.1]
+    A_s: [0.5, 5.]
     n_s:
-    w0: [-1.5, 1.5]
+    w0: [-3., 0.]
     wa:
     logT_AGN:
     A_IA:
