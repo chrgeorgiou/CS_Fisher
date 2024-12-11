@@ -502,10 +502,10 @@ class fisher_matrix(object):
         for ip, p in enumerate(self.parameters):
             if p in self.cosmo_params['name']:
                 M[ip, A_s_idx] = S8 / sigma8 * dsig8[p]
-        #M[Omega_m_idx, A_s_idx] += sigma8**2/(0.6*S8)
+        M[Omega_m_idx, A_s_idx] += sigma8**2/(0.6*S8)
         M = np.linalg.inv(M)
 
-        return self.transform_fisher_matrix(M, 'A_s', 'S8', S8)
+        return self.transform_fisher_matrix(M, 'A_s', 'S8', S8[0])
 
     def transform_A_s_to_m9A_s(self):
         M = np.identity(self.dim)

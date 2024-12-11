@@ -32,11 +32,11 @@ derivatives:
         Omega_m: 0.003
         Omega_b:
         h:
-        sigma8: 0.01
+        A_s: 0.002
         n_s:
-        w0: 0.01
+        w0: 0.002
         wa:
-        logT_AGN: 0.01
+        logT_AGN: 0.002
         A_IA:
         delta_z:
 
