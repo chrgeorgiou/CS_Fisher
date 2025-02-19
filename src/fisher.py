@@ -571,9 +571,9 @@ class fisher_matrix(object):
             mu = self.fiducial_parameters[np.in1d(self.parameters, parameters)]
         latex = self.latex_parameters[np.in1d(self.parameters, parameters)]
         # Below we have 128 bit float numbers for precision when using A_s
-        a = C[0, 0].astype(np.float128)  # sigma_x^2
-        b = C[0, 1].astype(np.float128)  # sigma_xy
-        c = C[1, 1].astype(np.float128) # sigma_y^2
+        a = C[0, 0].astype(np.float64)  # sigma_x^2
+        b = C[0, 1].astype(np.float64)  # sigma_xy
+        c = C[1, 1].astype(np.float64) # sigma_y^2
 
         # semi-major axis (squared and scaled)
         lambda1 = scale * 0.5 * (a + c + np.sqrt((a - c) ** 2 + 4 * b ** 2))

@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.integrate import simps
+from scipy.integrate import simpson
 from scipy.stats import rv_histogram
 import warnings
 
@@ -16,10 +16,10 @@ def p_ph_z_p(z_p, z, f_out = 0., sigma_b = 0.05, sigma_o = 0.05, c_b = 1.0, c_o 
 
 def nz_phot(z, nz, zi_m, zi_p, sigma_z=0.05):
     z_phot = np.linspace(zi_m, zi_p, num=128)
-    nominator = simps(nz * p_ph_z_p(z_p=z_phot.reshape(len(z_phot),1),
+    nominator = simpson(nz * p_ph_z_p(z_p=z_phot.reshape(len(z_phot),1),
                                     z=z.reshape(1, len(z)), sigma_b=sigma_z),
                       z_phot, axis=0)
-    denominator = simps(nominator, z)
+    denominator = simpson(nominator, z)
     return nominator/denominator
 
 
