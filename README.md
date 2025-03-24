@@ -18,9 +18,10 @@ paths:
         fisher_matrix: Output of calculated arrays (fisher matrix, validation).
         figures: Output of figures (not used now).
 
-validation: Which parameters to use to calculate figure-of-merit for validation.
-
 cosmology: The values of corresponding cosmological parameters.
+
+baryons:
+    logT_AGN: Value of the log T_AGN parameter of HMCode2020 to model baryonic feedback
 
 IA:
     A_IA: The value of the NLA amplitude.
