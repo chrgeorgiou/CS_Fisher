@@ -43,12 +43,17 @@ def load_config(config_file):
         config['baryons'] = {'logT_AGN': None}
     config.update(baryons_dictionary(config))
 
+    # Sergi
+    #Check for neutrino parameters in config file
+    if 'neutrinos' not in config.keys() or 'm_nu' not in config['cosmology']:
+        config['cosmology']['m_nu'] = 0.0
+        config['neutrinos'] = {'mass_split':'normal'}
+
     # Add redshift information from SRD (Y1 and Y10)
     config.update(redshift_distributions_for_year(config['forecast']['year']))
 
     # Correct if some parameters are missing from the derivatives list, don't vary them.
-    for key in (list(config['cosmology'].keys())+list(config['IA'].keys())+
-                list(config['baryons'].keys())+['delta_z']):
+    for key in (list(config['cosmology'].keys())+list(config['IA'].keys())+list(config['baryons'].keys())+['delta_z']):
         if key not in config['derivatives']['step_size']:
             config['derivatives']['step_size'][key] = None
 

@@ -4,7 +4,10 @@ from scipy.interpolate import interp1d
 from matplotlib.patches import Ellipse
 from scipy.stats import chi2
 import warnings
-from .utils import sigma8_derivative, names_to_latex
+from .utils import sigma8_derivative, names_to_latex, compute_Omega_nu
+# Sergi
+# Adding this through here for now (testing)
+from .sergi_functions import get_pk_halomod, get_Cell_data_vector_halomod
 
 
 def get_Cell_data_vector(cosmo: ccl.Cosmology,
@@ -33,8 +36,8 @@ def get_Cell_data_vector(cosmo: ccl.Cosmology,
             The tracers will be 'zi-zj', where i,j denote the redshift bins.
             :param z0:
     """
-    dndz_use = np.atleast_2d(dndz)
-    n_z_bins = dndz_use.shape[0]
+    dndz_use = np.atleast_2d(dndz) 
+    n_z_bins = dndz_use.shape[0] 
     if A_IA is None:
         ia_bias = None
     else:
@@ -66,6 +69,16 @@ def get_nt_nz(c_ells: dict) -> (int, int):
     # FIXME: This doesn't work for more than 10 bins!
     n_zbins = len(np.unique([x[1] for x in tracer_combinations]))
     return n_zbins
+    
+    # Sergi
+    # Possible fix 
+    '''
+    bins = set() #removes the duplicates
+    for key in tracer_combinations:
+        bins.add(key.split('-')[0]) #splits redshift keys and adds the left zi value to set
+    return len(bins)  # the lenght of the set will be the amount of bins used
+    '''
+    
 
 
 def get_covariance(ell: np.ndarray, c_ells: dict,
@@ -152,7 +165,7 @@ def compute_SNR(c_ells: dict, covariance: np.ndarray) -> float:
 
 def compute_d_Cells(n_points: int,
                     cosmo_params: dict, astro_params: dict, redshift_params: dict,
-                    z: np.ndarray, dndz: np.ndarray, ell: np.ndarray,
+                    z: np.ndarray, dndz: np.ndarray, ell: np.ndarray, 
                     verbose: bool = False) -> np.ndarray:
     """
     Computes the numerical derivatives of the C_ell's with respect to the input
@@ -211,6 +224,9 @@ def compute_d_Cells(n_points: int,
     step_coeff = np.arange(-(n_points // 2), n_points // 2 + 1, 1)
     step_coeff = step_coeff[step_coeff != 0]
 
+    # Sergi
+    # SOMEWHERE around here add unpack cosmo_params function to go from [m1,m2,m3] --> m1,m2,m3 ??
+
     params_fiducial = np.concatenate((cosmo_params['fiducial'], astro_params['fiducial'], redshift_params['fiducial']))
     params_name = np.concatenate((cosmo_params['name'], astro_params['name'], redshift_params['name']))
     params_shift = np.concatenate((cosmo_params['shift'], astro_params['shift'], redshift_params['shift']))
@@ -231,8 +247,12 @@ def compute_d_Cells(n_points: int,
             # Define cosmology input dictionary
             cosmo_params_in = param_in[:N_cosmo]
             cosmo_in_dict = dict(zip(cosmo_params['name'], cosmo_params_in))
-            if 'Omega_m' in cosmo_in_dict.keys():
-                cosmo_in_dict['Omega_c'] = cosmo_in_dict['Omega_m'] - cosmo_in_dict['Omega_b']
+
+            # Sergi
+            # substract 'Omega_nu' 
+            
+            if 'Omega_m' in cosmo_in_dict.keys(): 
+                cosmo_in_dict['Omega_c'] = cosmo_in_dict['Omega_m'] - cosmo_in_dict['Omega_b'] - compute_Omega_nu(cosmo_in_dict['m_nu'], cosmo_in_dict['h'], cosmo_params['mass_split'])
                 cosmo_in_dict.pop('Omega_m')
 
             # Define the IA input parameters
@@ -257,11 +277,21 @@ def compute_d_Cells(n_points: int,
                 shifted_bin = pi-(len(params_fiducial)-N_z_bins)
                 interp_dndz = interp1d(z, dndz_use[shifted_bin], bounds_error=False, fill_value=0)
                 dndz_in[shifted_bin] = interp_dndz(z + delta_z_in)
-
+                
+            # Sergi
+            # Somewhere around here I should pack again the shifted m1,m2,m3 -> [m1,m2,m3] 
+            # Here we have to specify again the neutrino mass_split (otherwise defaults to normal and raises an error)
             cosmo_in = ccl.Cosmology(**cosmo_in_dict,
+                                     mass_split=cosmo_params['mass_split'],
                                      matter_power_spectrum='camb',
                                      extra_parameters={"camb": {"dark_energy_model": "ppf"} | baryons_dict})
+           
             C_ells = get_Cell_data_vector(cosmo_in, z, dndz_in, A_IA_in, eta_in, ell=ell)
+            # Sergi
+            # Change old C_ells for halomodel-calculated ones
+            # When computing pks, other args should be specified in the future like: k, a_arr, b, a1h, hm_def, C1rhocrit
+            #pk_II, pk_GI = get_pk_halomod(cosmo_in, A_IA_in) 
+            #C_ells = get_Cell_data_vector_halomod(cosmo_in, z, dndz_in, pk_II, pk_GI, ell, True, True, True)
             d_Cells[:, di, :] += coeff[n] * np.array(list(C_ells.values())).T / params_shift[pi]
         di += 1
     return d_Cells
@@ -629,6 +659,9 @@ class fisher_matrix(object):
         FoM_output = np.zeros((N_parameters, len(shifts)))
 
         for i, shift in enumerate(shifts):
+            # Sergi
+            # Testing purposes
+            print('shift',i)
             for pi, p in enumerate(shift_parameters):
 
                 cosmo_params_shift = self.cosmo_params.copy()

@@ -1,7 +1,10 @@
+
 import pyccl as ccl
 import numpy as np
 from itertools import pairwise
-from src import load_config, fisher_matrix, redshift_distributions, IO, names_to_latex
+# Sergi
+# Imported compute_Omega_nu
+from src import load_config, fisher_matrix, redshift_distributions, IO, names_to_latex, compute_Omega_nu
 
 
 def main(config):
@@ -9,12 +12,20 @@ def main(config):
 
     # Load the cosmology
     ccl_cosmo_params = dict(zip(config.cosmology.keys(), config.cosmology.values()))
+
     if 'Omega_m' in ccl_cosmo_params.keys():
-        ccl_cosmo_params['Omega_c'] = ccl_cosmo_params['Omega_m'] - ccl_cosmo_params['Omega_b']
+        # Sergi
+        # Substract Omega_nu (in therms of variables from cosmology) --> function defined in src/utils.py
+        #ccl_cosmo_params['Omega_c'] = ccl_cosmo_params['Omega_m'] - ccl_cosmo_params['Omega_b']
+        ccl_cosmo_params['Omega_c'] = ccl_cosmo_params['Omega_m'] - ccl_cosmo_params['Omega_b'] - compute_Omega_nu(config.cosmology.m_nu, config.cosmology.h, config.neutrinos.mass_split)
         ccl_cosmo_params.pop('Omega_m')
+
+    #Sergi
+    # Add mass_split to cosmology inputs
     cosmo = ccl.Cosmology(**ccl_cosmo_params,
+                          mass_split = config.neutrinos.mass_split,
                           matter_power_spectrum='camb',
-                          extra_parameters = {"camb": config.baryons_dict})
+                           extra_parameters = {"camb": config.baryons_dict})
 
     # ell binning setup
     ell_bins = np.geomspace(config.ell_binning.cosmic_shear.bin_start,
@@ -40,10 +51,13 @@ def main(config):
             config.redshift_distributions.sources.sigma_z))
 
     # Define the fisher matrix setup
+    #Sergi
+    # Add mass split key and value to cosmo_params
     cosmo_params = {'name': list(config.cosmology.keys()),
                     'fiducial': list(config.cosmology.values()),
                     'shift': [config.derivatives.step_size[x] for x in list(config.cosmology.keys())],
-                    'latex': [names_to_latex(x) for x in config.cosmology.keys()]}
+                    'latex': [names_to_latex(x) for x in config.cosmology.keys()],
+                    'mass_split': config.neutrinos.mass_split}
     astro_params = {'name': list(config.IA.keys())+list(config.baryons.keys()),
                     'fiducial': list(config.IA.values())+list(config.baryons.values()),
                     'shift': [config.derivatives.step_size[x] for x in list(config.IA.keys())+list(config.baryons.keys())],
@@ -51,7 +65,8 @@ def main(config):
     redshift_params = {'name': [f'dz{i+1}' for i in range(N_z_bins)],
                        'fiducial': [0.] * N_z_bins,
                        'shift': [config.derivatives.step_size.delta_z] * N_z_bins,
-                       'latex': ['$\Delta z_{%i}$' % (i + 1) for i in range(N_z_bins)]}
+                       'latex': [r'$\Delta z_{%i}$' % (i + 1) for i in range(N_z_bins)]}
+
 
     # Compute the fisher matrix
     print(f'Computing fisher matrix.')
@@ -71,7 +86,8 @@ def main(config):
 
     # Fisher matrix validation
     print(f'Producing fisher matrix validation plot.')
-    shifts = np.geomspace(1e-3, 1e-2, 16)
+    # Sergi
+    shifts = np.geomspace(1e-3, 1e-2, 10) ## I decreased this for faster compiling while testing. Previous: (1e-3, 1e-2, 16)
     FoM_parameters = config.derivatives.validation
     FoM_validation = fm.validate_fisher_matrix(shifts, FoM_parameters)
 

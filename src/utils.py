@@ -37,6 +37,10 @@ def names_to_latex(parameter_name, dollar_signs=True):
         latex_name = r'\log_{10}\left(A_s\right)'
     elif parameter_name == 'S8':
         latex_name = 'S_8'
+    # Sergi
+    # Add m_nu parameter for neutrinos
+    elif parameter_name == 'm_nu':
+        latex_name = r'm_\nu'
 
     else:
         raise ValueError(f'Not recognised parameter {parameter_name} and cannot return its latex string.')
@@ -81,3 +85,26 @@ def sigma8_derivative(cosmo_dict, parameter, shift, n_points):
         dsigma8 += coeff[n] * cosmo_in.sigma8() / shift
 
     return dsigma8
+
+
+# Sergi
+# Pending to revise
+def compute_Omega_nu(m_nu, h: float, mass_split: str, C_nu: float = 93.14) -> float:
+    """
+    Computes Omega_nu from neutrino mass and cosmological parameters.
+
+    Args:
+        m_nu (float or list of float): Total neutrino mass in eV (float) or list of individual masses (if mass_split == 'list').
+        h (float): Reduced Hubble constant (H0 / 100), where H0 is in km/s/Mpc.
+        mass_split (str): Neutrino mass split type. Must be one of ['equal', 'list', 'sum', 'single', 'normal', 'inverted'].
+        C_nu (float): Conversion factor between neutrino mass and Omega_nu. Default is 93.14 (from Planck units).
+
+    Returns:
+        float: Computed value of Omega_nu.
+    """
+    if mass_split == 'list' or isinstance(m_nu, (list, tuple)):
+        M_nu = sum(m_nu)
+    else:
+        M_nu = m_nu
+
+    return M_nu / (C_nu * h**2)

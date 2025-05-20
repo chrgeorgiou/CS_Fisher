@@ -1,8 +1,9 @@
 import os
 import numpy as np
 import pyccl as ccl
-from src import fisher_matrix, names_to_latex
+from src import fisher_matrix, names_to_latex, compute_Omega_nu
 from src.configs import DictAsMember
+
 
 
 # TODO: I should change this all...
@@ -32,11 +33,15 @@ def load_fisher_matrix(config: DictAsMember,
     fisher_matrix_array = np.load(os.path.join(config.paths.output.fisher_matrix,
                                                f'{config.name}_{name}.npy'))
     # Load the cosmology
+    # Sergi
+    # Substract neutrinos to Omega_m and add mass_split to ccl.cosmology
     ccl_cosmo_params = dict(zip(config.cosmology.keys(), config.cosmology.values()))
     if 'Omega_m' in ccl_cosmo_params.keys():
-        ccl_cosmo_params['Omega_c'] = ccl_cosmo_params['Omega_m'] - ccl_cosmo_params['Omega_b']
+        #ccl_cosmo_params['Omega_c'] = ccl_cosmo_params['Omega_m'] - ccl_cosmo_params['Omega_b']
+        ccl_cosmo_params['Omega_c'] = ccl_cosmo_params['Omega_m'] - ccl_cosmo_params['Omega_b'] - compute_Omega_nu(config.cosmology.m_nu, config.cosmology.h, config.neutrinos.mass_split)
         ccl_cosmo_params.pop('Omega_m')
     cosmo = ccl.Cosmology(**ccl_cosmo_params,
+                          mass_split = config.neutrinos.mass_split,
                           matter_power_spectrum='camb',
                           extra_parameters={"camb": config.baryons_dict})
 
