@@ -24,6 +24,10 @@ def parse_args():
     parser.add_argument('-c', '--config', dest='config',
                         help='Location of the configuration yaml file.',
                         default='../configs/config_main.yaml')
+    parser.add_argument('-b', '--biased_config', dest='biased_config',
+                        help='Location of the configuration yaml file for analysing '
+                             'a biased cosmology.',
+                        default=None)
     parser.add_argument('-o', '--output', dest='output_filename',
                         help='Location of the output hdf5 file.',
                         default='NS_validation.hdf5')
@@ -97,7 +101,7 @@ astro_params = {'name': list(config.IA.keys())+list(config.baryons.keys()),
 redshift_params = {'name': [f'dz{i+1}' for i in range(N_z_bins)],
                    'fiducial': [0.] * N_z_bins,
                    'shift': [config.derivatives.step_size.delta_z] * N_z_bins,
-                   'latex': ['$\Delta z_{%i}$' % (i + 1) for i in range(N_z_bins)]}
+                   'latex': [r'$\Delta z_{%i}$' % (i + 1) for i in range(N_z_bins)]}
 
 # Compute the fisher matrix
 print(f'Computing fisher matrix.')
@@ -142,14 +146,16 @@ for ip, p in enumerate(config.sampling_validation.keys()):
     else:
         raise ValueError(f'Input sampling parameter in config file had problem: {p}.')
 
+if args.biased_config is not None:
+    config = load_config(args.biased_config)
 
 # Likelihood
 def likelihood(param_dict):
     cosmo_in_dict = config.cosmology.copy()
     # These three: if set from fm, cannot run bias analysis.
-    bayrons_dict_in = {} #config.baryons_dict.copy()
-    A_IA_in = None #fm.A_IA
-    eta_in = None #fm.eta
+    bayrons_dict_in = config.baryons_dict.copy()
+    A_IA_in = fm.A_IA
+    eta_in = fm.eta
     dndz_in = nz_arr
 
     for ip, p in enumerate(config.sampling_validation.keys()):

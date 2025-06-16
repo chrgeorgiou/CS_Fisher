@@ -51,7 +51,7 @@ def main(config):
     redshift_params = {'name': [f'dz{i+1}' for i in range(N_z_bins)],
                        'fiducial': [0.] * N_z_bins,
                        'shift': [config.derivatives.step_size.delta_z] * N_z_bins,
-                       'latex': ['$\Delta z_{%i}$' % (i + 1) for i in range(N_z_bins)]}
+                       'latex': [r'$\Delta z_{%i}$' % (i + 1) for i in range(N_z_bins)]}
 
     # Compute the fisher matrix
     print(f'Computing fisher matrix.')
