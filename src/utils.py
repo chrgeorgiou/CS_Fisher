@@ -4,32 +4,32 @@ import pyccl as ccl
 
 def names_to_latex(parameter_name, dollar_signs=True):
     if parameter_name=='Omega_m':
-        latex_name = '\Omega_\mathrm{m}'
+        latex_name = r'\Omega_\mathrm{m}'
     elif parameter_name=='Omega_b':
-        latex_name = '\Omega_\mathrm{b}'
+        latex_name = r'\Omega_\mathrm{b}'
     elif parameter_name == 'h':
         latex_name = 'h'
     elif parameter_name == 'n_s':
-        latex_name = 'n_\mathrm{s}'
+        latex_name = r'n_\mathrm{s}'
     elif parameter_name == 'sigma8':
-        latex_name = '\sigma_8'
+        latex_name = r'\sigma_8'
     elif parameter_name == 'A_s':
-        latex_name = 'A_\mathrm{s}'
+        latex_name = r'A_\mathrm{s}'
     elif parameter_name == 'w0':
         latex_name = 'w_0'
     elif parameter_name == 'wa':
         latex_name = 'w_a'
 
     elif parameter_name == 'A_IA':
-        latex_name = 'A_\mathrm{IA}'
+        latex_name = r'A_\mathrm{IA}'
     elif parameter_name == 'eta':
-        latex_name = '\eta'
+        latex_name = r'\eta'
     elif parameter_name == 'logT_AGN':
-        latex_name = '\log T_\mathrm{AGN}'
+        latex_name = r'\log T_\mathrm{AGN}'
 
     elif parameter_name.startswith('dz'):
         z_bin = parameter_name.split('dz')[1]
-        latex_name = f'\Delta z_{z_bin}'
+        latex_name = rf'\Delta z_{z_bin}'
 
     elif parameter_name == 'A_s_9':
         latex_name = '10^{9}A_s'

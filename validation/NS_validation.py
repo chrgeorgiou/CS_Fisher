@@ -109,7 +109,7 @@ fm = fisher_matrix(cosmo=cosmo, z=z_arr, dndz=nz_arr, ell=ell_arr,
                    astro_params=astro_params, redshift_params=redshift_params)
 
 # Add Gaussian photo-z priors
-mean_z = np.trapz(nz_arr * z_arr, z_arr)
+mean_z = np.trapezoid(nz_arr * z_arr, z_arr)
 scale_z = config.redshift_distributions.sources.sigma_delta_z*(1+mean_z)
 fm.add_prior(redshift_params['name'], scale_z)
 

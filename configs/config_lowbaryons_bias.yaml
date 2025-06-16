@@ -19,7 +19,7 @@ cosmology:
     wa: 0
 
 baryons:
-    logT_AGN: 8
+    logT_AGN: 7.7
 
 IA:
     A_IA:
@@ -36,7 +36,7 @@ derivatives:
         n_s:
         w0: 0.002
         wa:
-        logT_AGN: 0.002
+        logT_AGN:
         A_IA:
         delta_z:
 

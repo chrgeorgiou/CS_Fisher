@@ -62,7 +62,7 @@ def main(config):
                        n_points=config.derivatives.stencil_points, cosmo_params=cosmo_params,
                        astro_params=astro_params, redshift_params=redshift_params)
     # Add Gaussian photo-z priors
-    mean_z = np.trapz(nz_arr * z_arr, z_arr)
+    mean_z = np.trapezoid(nz_arr * z_arr, z_arr)
     scale_z = config.redshift_distributions.sources.sigma_delta_z*(1+mean_z)
     fm.add_prior(redshift_params['name'], scale_z)
 
