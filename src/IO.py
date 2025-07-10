@@ -53,7 +53,7 @@ def load_fisher_matrix(config: DictAsMember,
     redshift_params = {'name': [f'dz{i+1}' for i in range(N_z_bins)],
                        'fiducial': [0.] * N_z_bins,
                        'shift': [config.derivatives.step_size.delta_z] * N_z_bins,
-                       'latex': ['$\Delta z_{%i}$' % (i + 1) for i in range(N_z_bins)]}
+                       'latex': [r'$\Delta z_{%i}$' % (i + 1) for i in range(N_z_bins)]}
 
     fisher_matrix_object = fisher_matrix(cosmo=cosmo,
                                          fisher_from_input=fisher_matrix_array,
