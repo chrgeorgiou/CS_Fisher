@@ -4,13 +4,12 @@ from scipy.interpolate import interp1d
 from matplotlib.patches import Ellipse
 from scipy.stats import chi2
 import warnings
-from .utils import sigma8_derivative, names_to_latex
-
+from .utils import sigma8_derivative, names_to_latex, get_Pk_of_k_a_IA
 
 def get_Cell_data_vector(cosmo: ccl.Cosmology,
                          z: np.ndarray, dndz: np.ndarray,
                          A_IA: float, eta: float = None, z0 :float = 0.62,
-                         ell: np.ndarray = None) \
+                         ell: np.ndarray = None, p_of_k_a : dict = None) \
         -> dict:
     """
     Computes the cosmic shear C_ell's. Assumes constant A_IA.
@@ -47,11 +46,23 @@ def get_Cell_data_vector(cosmo: ccl.Cosmology,
     for z1 in range(n_z_bins):
         for z2 in range(n_z_bins):
             if z2 < z1: continue
-            tracer1 = ccl.WeakLensingTracer(cosmo, dndz=(z, dndz_use[z1]),
-                                            ia_bias=ia_bias)
-            tracer2 = ccl.WeakLensingTracer(cosmo, dndz=(z, dndz_use[z2]),
-                                            ia_bias=ia_bias)
-            c_ells[f'z{z1}-z{z2}'] = ccl.angular_cl(cosmo, tracer1, tracer2, ell)
+            if p_of_k_a is None:
+                tracer1 = ccl.WeakLensingTracer(cosmo, dndz=(z, dndz_use[z1]),
+                                                ia_bias=ia_bias)
+                tracer2 = ccl.WeakLensingTracer(cosmo, dndz=(z, dndz_use[z2]),
+                                                ia_bias=ia_bias)
+                c_ells[f'z{z1}-z{z2}'] = ccl.angular_cl(cosmo, tracer1, tracer2, ell)
+            else:
+                wl_tracer_z1 = ccl.WeakLensingTracer(cosmo,dndz = (z, dndz_use[z1]))
+                wl_tracer_z2 = ccl.WeakLensingTracer(cosmo,dndz = (z, dndz_use[z2]))
+                ia_tracer_z1 = ccl.WeakLensingTracer(cosmo,dndz = (z, dndz_use[z1]), has_shear=False, ia_bias = ia_bias, use_A_ia=False)
+                ia_tracer_z2 = ccl.WeakLensingTracer(cosmo,dndz = (z, dndz_use[z2]), has_shear=False, ia_bias = ia_bias, use_A_ia=False)
+
+                c_ell_GG = ccl.angular_cl(cosmo, wl_tracer_z1, wl_tracer_z2, ell)
+                c_ell_GI = ccl.angular_cl(cosmo, wl_tracer_z1, ia_tracer_z2, ell, p_of_k_a=p_of_k_a[0])
+                c_ell_IG = ccl.angular_cl(cosmo, ia_tracer_z1, wl_tracer_z2, ell, p_of_k_a=p_of_k_a[0])
+                c_ell_II = ccl.angular_cl(cosmo, ia_tracer_z1, ia_tracer_z2, ell, p_of_k_a=p_of_k_a[1])
+                c_ells[f'z{z1}-z{z2}'] = c_ell_GG + c_ell_GI + c_ell_IG + c_ell_II
     return c_ells
 
 
@@ -238,6 +249,7 @@ def compute_d_Cells(n_points: int,
             # Define the IA input parameters
             A_IA_in = param_in[np.isin(params_name, 'A_IA')][0]
             eta_in = param_in[np.isin(params_name, 'eta')][0]
+            a1h_in = param_in[np.isin(params_name, 'a1h')][0]
 
             # Define the baryon feedback parameters
             try:
@@ -262,7 +274,12 @@ def compute_d_Cells(n_points: int,
             cosmo_in = ccl.Cosmology(**cosmo_in_dict,
                                      matter_power_spectrum='camb',
                                      extra_parameters={"camb": {"dark_energy_model": "ppf"} | baryons_dict})
-            C_ells = get_Cell_data_vector(cosmo_in, z, dndz_in, A_IA_in, eta_in, ell=ell)
+
+            if a1h_in is None:
+                C_ells = get_Cell_data_vector(cosmo_in, z, dndz_in, A_IA_in, eta_in, ell=ell)
+            else:
+                pk_of_k_a = get_Pk_of_k_a_IA(cosmo_in, a1h=a1h_in, A_IA=A_IA_in)
+                C_ells = get_Cell_data_vector(cosmo_in, z, dndz_in, A_IA_in, eta_in, ell=ell, p_of_k_a=pk_of_k_a)
             d_Cells[:, di, :] += coeff[n] * np.array(list(C_ells.values())).T / params_shift[pi]
         di += 1
     return d_Cells
@@ -320,7 +337,7 @@ class fisher_matrix(object):
         if cosmo_params is None:
             self.cosmo_params = {'name': [], 'fiducial': [], 'shift': []}
         if astro_params is None:
-            self.astro_params = {'name': ['A_IA', 'eta'], 'fiducial': [None, None], 'shift': [None, None]}
+            self.astro_params = {'name': ['A_IA', 'eta', 'a1h'], 'fiducial': [None, None, None], 'shift': [None, None, None]}
         if redshift_params is None:
             self.redshift_params = {'name': [], 'fiducial': [], 'shift': []}
 
@@ -329,6 +346,7 @@ class fisher_matrix(object):
                all(s in self.redshift_params for s in ['name', 'fiducial'])
 
         self.A_IA = np.array(self.astro_params['fiducial'])[np.isin(self.astro_params['name'], 'A_IA')][0]
+        self.a1h = np.array(self.astro_params['fiducial'])[np.isin(self.astro_params['name'], 'a1h')][0]
         self.eta = np.array(self.astro_params['fiducial'])[np.isin(self.astro_params['name'], 'eta')][0]
         for param_dict in [self.cosmo_params, self.astro_params, self.redshift_params]:
             if 'latex' not in param_dict:
@@ -337,7 +355,7 @@ class fisher_matrix(object):
                 param_dict['shift'] = [-1.]*len(param_dict['name'])
 
         if fisher_from_input is None:
-            self.C_ell = get_Cell_data_vector(self.cosmo, self.z, self.dndz, self.A_IA, self.eta, ell=self.ell)
+            self.C_ell = get_Cell_data_vector(self.cosmo, self.z, self.dndz, self.A_IA, self.eta, ell=self.ell, p_of_k_a=get_Pk_of_k_a_IA(self.cosmo, a1h=self.a1h, A_IA=self.A_IA))
             self.data_covariance = get_covariance(self.ell, self.C_ell,
                                                   self.n_bar, self.sigma_e,
                                                   f_sky=self.fsky, Delta_ell=self.Delta_ell)
