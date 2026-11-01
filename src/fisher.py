@@ -478,7 +478,7 @@ class fisher_matrix(object):
         M = np.identity(self.dim)
         for ip, p in enumerate(self.parameters):
             if p in self.cosmo_params['name']:
-                M[ip, A_s_idx] = dsig8[p]
+                M[A_s_idx, ip] = dsig8[p]
         M = np.linalg.inv(M)
 
         return self.transform_fisher_matrix(M, 'A_s', 'sigma8', self.cosmo.sigma8())
