@@ -19,6 +19,10 @@ cosmology:
 
 IA:
     A_IA: 1.0
+    a1h:
+    a1:
+    a2:
+    ad:
     eta: 0.0
 
 derivatives:
