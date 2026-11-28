@@ -19,7 +19,11 @@ cosmology:
 
 IA:
     A_IA: 1.0
+    a1h:
+    a2:
+    b_TA:
     eta: 0.0
+    eta_2:
 
 derivatives:
     validation: [w0, wa]

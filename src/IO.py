@@ -26,6 +26,14 @@ def save_fisher_matrix_validation(config: DictAsMember,
     np.savez(os.path.join(output_dir, f'{config.name}_{name}.npz'),
              shifts=shifts_array, validation=validation_array)
 
+def save_bias_vector(config1: DictAsMember, config2: DictAsMember, bias_vector: np.ndarray, name: str):
+    output_dir = config1.paths.output.fisher_matrix
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    np.save(os.path.join(output_dir, f'{config1.name}_{config2.name}_{name}.npy'),
+            bias_vector)
+
 
 def load_fisher_matrix(config: DictAsMember,
                        name: str) -> fisher_matrix:

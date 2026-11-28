@@ -23,7 +23,11 @@ baryons:
 
 IA:
     A_IA:
+    a1h:
+    a2:
+    b_TA:
     eta:
+    eta_2:
 
 derivatives:
     validation: [Omega_m, A_s]
